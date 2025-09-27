@@ -2,6 +2,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
+import { TrendingUp, DollarSign, Shield, Zap } from "lucide-react";
 import Footer from "./Footer";
 import WalletInfo from "./WalletInfo";
 import DepositPYUSD from "./DepositPYUSD";
@@ -13,78 +14,133 @@ export default function InvestorRoute() {
   const { isConnected } = useAccount();
 
   return (
-    <div className='container   p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
+    <div className='min-h-screen bg-background'>
       <Helmet>
         <title>Invoice Factor - For Investors</title>
         <meta name='description' content='Earn yield by providing PYUSD liquidity for invoice factoring' />
         <link rel='canonical' href='https://invoice-factor.example.com/investor' />
       </Helmet>
       
-      <nav className='flex flex-row gap-4 items-center justify-between'>
-        <div>
-          <h1 className='text-xl font-black'>Invoice Factor</h1>
-          <p className='text-sm text-gray-500'>For Investors - Earn Yield on PYUSD</p>
-        </div>
-        <div className='flex items-center gap-4'>
-          <Link 
-            to="/" 
-            className='text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300'
-          >
-            Home
-          </Link>
-          <Link 
-            to="/business" 
-            className='text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300'
-          >
-            For Business
-          </Link>
-          <Link 
-            to="/customer" 
-            className='text-sm text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300'
-          >
-            Pay Invoice
-          </Link>
-          <ConnectButton />
+      {/* Minimal Top Navigation */}
+      <nav className='minimal-nav'>
+        <div className='max-w-6xl mx-auto px-6 py-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-8'>
+              <Link to="/" className='text-2xl font-bold text-foreground'>
+                Invoice Factor
+              </Link>
+              <div className='hidden md:flex items-center gap-6'>
+                <Link to="/business" className='text-muted-foreground hover:text-foreground transition-colors'>
+                  For Business
+                </Link>
+                <Link to="/customer" className='text-muted-foreground hover:text-foreground transition-colors'>
+                  Pay Invoice
+                </Link>
+                <Link to="/dashboard" className='text-muted-foreground hover:text-foreground transition-colors'>
+                  Dashboard
+                </Link>
+              </div>
+            </div>
+            <ConnectButton />
+          </div>
         </div>
       </nav>
-      
-      <div className='flex-1'>
+
+      {/* Main Content */}
+      <main className='pt-24'>
         {isConnected ? (
-          <div className='space-y-8'>
-            <WalletInfo />
-            
-            {/* Investor Workflow Steps */}
-            <div className='space-y-6'>
-              <div className='text-center'>
-                <h2 className='text-2xl font-bold mb-2'>Earn 8-15% APR on PYUSD</h2>
-                <p className='text-gray-500'>
-                  Provide liquidity to invoice factoring and earn competitive returns
+          <div className='minimal-section space-y-24'>
+            {/* Hero Section */}
+            <div className='text-center space-y-8'>
+              <h1 className='text-6xl font-bold text-foreground leading-tight'>
+                Earn Yield on
+                <br />
+                <span className='text-primary'>PYUSD</span>
+              </h1>
+              <p className='text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed'>
+                Provide liquidity to invoice factoring and earn 8-15% APR on your PYUSD holdings
+              </p>
+            </div>
+
+            {/* Benefits Section */}
+            <div className='bg-muted/30 p-16 rounded-3xl space-y-12'>
+              <div className='text-center space-y-4'>
+                <h2 className='text-4xl font-bold text-foreground'>
+                  Why Invest in Invoice Factoring?
+                </h2>
+                <p className='text-lg text-muted-foreground max-w-2xl mx-auto'>
+                  Diversify your portfolio with real-world business financing
                 </p>
               </div>
-              
-              {/* Step 1: Deposit PYUSD */}
+
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-12'>
+                <div className='text-center space-y-6'>
+                  <div className='w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto'>
+                    <TrendingUp className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className='space-y-3'>
+                    <h3 className='text-xl font-bold text-foreground'>High Returns</h3>
+                    <p className='text-muted-foreground'>
+                      Earn 8-15% APR on your PYUSD, significantly higher than traditional savings
+                    </p>
+                  </div>
+                </div>
+
+                <div className='text-center space-y-6'>
+                  <div className='w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto'>
+                    <Shield className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className='space-y-3'>
+                    <h3 className='text-xl font-bold text-foreground'>Low Risk</h3>
+                    <p className='text-muted-foreground'>
+                      Backed by real business invoices with transparent risk assessment
+                    </p>
+                  </div>
+                </div>
+
+                <div className='text-center space-y-6'>
+                  <div className='w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto'>
+                    <Zap className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className='space-y-3'>
+                    <h3 className='text-xl font-bold text-foreground'>Instant Liquidity</h3>
+                    <p className='text-muted-foreground'>
+                      Withdraw your funds anytime with our flexible liquidity options
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* User Status */}
+            <div className='space-y-12'>
+              <WalletInfo />
+            </div>
+            
+            {/* Main Workflow */}
+            <div className='space-y-16'>
               <DepositPYUSD />
-              
-              {/* Step 2: Set Risk Preferences */}
               <RiskPreferences />
-              
-              {/* Step 3: Automatic Matching */}
               <AutomaticMatching />
-              
-              {/* Step 4: Collect Returns */}
               <CollectReturns />
             </div>
           </div>
         ) : (
-          <div className='text-center py-16'>
-            <h2 className='text-2xl font-bold mb-4'>Connect Your Investor Wallet</h2>
-            <p className='text-gray-500 mb-8'>
-              Connect your wallet to start earning yield on PYUSD through invoice factoring
-            </p>
-            <ConnectButton />
+          <div className='minimal-section text-center space-y-12'>
+            <div className='space-y-8'>
+              <h1 className='text-6xl font-bold text-foreground leading-tight'>
+                Connect Your Wallet
+              </h1>
+              <p className='text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed'>
+                Connect your wallet to start earning yield on PYUSD through invoice factoring
+              </p>
+            </div>
+            <div className='flex justify-center'>
+              <ConnectButton />
+            </div>
           </div>
         )}
-      </div>
+      </main>
       
       <Footer />
     </div>

@@ -14,6 +14,7 @@ import { isContractDeployed } from "@/config/contract";
 import { useAccount } from "wagmi";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useInvoices } from "@/hooks/useInvoices";
+import { downloadSampleInvoice } from "@/lib/sampleInvoiceGenerator";
 
 interface InvoiceUploadProps {
   onQuoteGenerated?: (quoteData: {
@@ -65,21 +66,61 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
     if (file && file.type === 'application/pdf') {
       setInvoiceData(prev => ({ ...prev, file }));
       
-      // Auto-parse the PDF
+      // Auto-parse the PDF and store in database
       setIsParsing(true);
       setParseProgress(0);
       
       try {
-        // Simulate progress
+        // Simulate progress for parsing (0-50%)
         const progressInterval = setInterval(() => {
-          setParseProgress(prev => Math.min(prev + 10, 90));
+          setParseProgress(prev => Math.min(prev + 5, 50));
         }, 200);
         
         const extracted = await extractInvoiceData(file);
         
         clearInterval(progressInterval);
-        setParseProgress(100);
+        setParseProgress(50);
         
+        // Store PDF in database if user is authenticated
+        let pdfUrl = "";
+        if (user) {
+          try {
+            // Simulate progress for database storage (50-90%)
+            const storageInterval = setInterval(() => {
+              setParseProgress(prev => Math.min(prev + 5, 90));
+            }, 100);
+            
+            // Upload PDF to Supabase Storage
+            pdfUrl = await uploadPDF(file, user.id);
+            console.log('PDF stored in Supabase Storage:', pdfUrl);
+            
+            // Create a database record to track the PDF
+            const invoiceRecord = await createInvoice({
+              user_id: user.id,
+              invoice_number: extracted.invoiceNumber || `INV-${Date.now()}`,
+              amount: parseFloat(extracted.amount || '0'),
+              due_date: extracted.dueDate || new Date().toISOString().split('T')[0],
+              customer_name: extracted.customerName || 'Unknown Customer',
+              customer_email: extracted.customerEmail || 'unknown@example.com',
+              description: extracted.description || 'PDF Invoice Upload',
+              pdf_url: pdfUrl,
+              pdf_filename: file.name,
+              status: 'draft'
+            });
+            
+            console.log('Invoice record created in database:', invoiceRecord);
+            
+            clearInterval(storageInterval);
+            setParseProgress(90);
+          } catch (error) {
+            console.error('Failed to store PDF in database:', error);
+            toast.error("PDF parsing successful, but failed to store in database. You can still proceed.");
+          }
+        } else {
+          console.log('User not authenticated, skipping PDF storage');
+        }
+        
+        setParseProgress(100);
         setParsedData(extracted);
         
         // Auto-fill form with extracted data (always try to fill if any data is available)
@@ -97,9 +138,9 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
           }));
           
           if (extracted.confidence > 70) {
-            toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+            toast.success(`Invoice parsed and stored successfully! (${extracted.confidence}% confidence)`);
           } else if (extracted.confidence > 30) {
-            toast.success(`Invoice parsed with good confidence! (${extracted.confidence}% confidence)`);
+            toast.success(`Invoice parsed and stored with good confidence! (${extracted.confidence}% confidence)`);
           } else if (extracted.confidence > 0) {
             toast.error(`Some data extracted (${extracted.confidence}% confidence). Please verify and complete manually.`);
           } else {
@@ -133,15 +174,56 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
     setParseProgress(0);
     
     try {
+      // Simulate progress for parsing (0-50%)
       const progressInterval = setInterval(() => {
-        setParseProgress(prev => Math.min(prev + 10, 90));
+        setParseProgress(prev => Math.min(prev + 5, 50));
       }, 200);
       
       const extracted = await extractInvoiceData(invoiceData.file);
       
       clearInterval(progressInterval);
-      setParseProgress(100);
+      setParseProgress(50);
       
+      // Store PDF in database if user is authenticated
+      let pdfUrl = "";
+      if (user) {
+        try {
+          // Simulate progress for database storage (50-90%)
+          const storageInterval = setInterval(() => {
+            setParseProgress(prev => Math.min(prev + 5, 90));
+          }, 100);
+          
+          // Upload PDF to Supabase Storage
+          pdfUrl = await uploadPDF(invoiceData.file, user.id);
+          console.log('PDF stored in Supabase Storage:', pdfUrl);
+          
+          // Create a database record to track the PDF
+          const invoiceRecord = await createInvoice({
+            user_id: user.id,
+            invoice_number: extracted.invoiceNumber || `INV-${Date.now()}`,
+            amount: parseFloat(extracted.amount || '0'),
+            due_date: extracted.dueDate || new Date().toISOString().split('T')[0],
+            customer_name: extracted.customerName || 'Unknown Customer',
+            customer_email: extracted.customerEmail || 'unknown@example.com',
+            description: extracted.description || 'PDF Invoice Upload',
+            pdf_url: pdfUrl,
+            pdf_filename: invoiceData.file.name,
+            status: 'draft'
+          });
+          
+          console.log('Invoice record created in database:', invoiceRecord);
+          
+          clearInterval(storageInterval);
+          setParseProgress(90);
+        } catch (error) {
+          console.error('Failed to store PDF in database:', error);
+          toast.error("PDF parsing successful, but failed to store in database. You can still proceed.");
+        }
+      } else {
+        console.log('User not authenticated, skipping PDF storage');
+      }
+      
+      setParseProgress(100);
       setParsedData(extracted);
       
       // Auto-fill form with extracted data (always try to fill if any data is available)
@@ -159,9 +241,9 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
         }));
         
         if (extracted.confidence > 70) {
-          toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+          toast.success(`Invoice parsed and stored successfully! (${extracted.confidence}% confidence)`);
         } else if (extracted.confidence > 30) {
-          toast.success(`Invoice parsed with good confidence! (${extracted.confidence}% confidence)`);
+          toast.success(`Invoice parsed and stored with good confidence! (${extracted.confidence}% confidence)`);
         } else if (extracted.confidence > 0) {
           toast.error(`Some data extracted (${extracted.confidence}% confidence). Please verify and complete manually.`);
         } else {
@@ -330,263 +412,279 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <div className='w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold'>
-            1
-          </div>
-          <div className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload Invoice
-          </div>
-        </CardTitle>
-        <p className='text-muted-foreground'>
-          Upload your invoice PDF and provide customer details to get an instant quote
+    <div className='minimal-card space-y-12'>
+      <div className='text-center space-y-4'>
+        <h2 className='text-4xl font-bold text-foreground'>
+          Upload Your Invoice
+        </h2>
+        <p className='text-lg text-muted-foreground max-w-2xl mx-auto'>
+          Upload a PDF invoice and we'll automatically extract all the details for you
         </p>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className='space-y-6'>
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-            <div className="space-y-2">
-              <Label htmlFor='amount' className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Invoice Amount (USD) *
-              </Label>
-              <Input
-                type='number'
-                id='amount'
-                value={invoiceData.amount}
-                onChange={(e) => handleInputChange('amount', e.target.value)}
-                placeholder='10000'
-                step='0.01'
-                min='0'
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor='dueDate' className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Due Date *
-              </Label>
-              <Input
-                type='date'
-                id='dueDate'
-                value={invoiceData.dueDate}
-                onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                required
-              />
-            </div>
-          </div>
-          
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-            <div className="space-y-2">
-              <Label htmlFor='customerName' className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Customer Name *
-              </Label>
-              <Input
-                type='text'
-                id='customerName'
-                value={invoiceData.customerName}
-                onChange={(e) => handleInputChange('customerName', e.target.value)}
-                placeholder='Acme Corp'
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor='customerEmail' className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Customer Email *
-              </Label>
-              <Input
-                type='email'
-                id='customerEmail'
-                value={invoiceData.customerEmail}
-                onChange={(e) => handleInputChange('customerEmail', e.target.value)}
-                placeholder='billing@acme.com'
-                required
-              />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor='description' className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Description
+      </div>
+      
+      <form onSubmit={handleSubmit} className='space-y-8'>
+        {/* PDF Upload Section - Priority */}
+        <div className="space-y-6">
+          <div className="text-center space-y-4">
+            <Label htmlFor='file' className='text-xl font-medium text-foreground'>
+              📄 Upload Invoice PDF
             </Label>
-            <Textarea
-              id='description'
-              value={invoiceData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder='Services rendered, products delivered, etc.'
-              rows={3}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor='file' className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Invoice PDF (Auto-Parse)
-            </Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col items-center gap-4">
               <Input
                 type='file'
                 id='file'
                 accept='.pdf'
                 onChange={handleFileChange}
                 disabled={isParsing}
-                className="flex-1"
+                className="minimal-input max-w-md"
               />
               {invoiceData.file && !isParsing && (
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={handleManualParse}
-                  className="shrink-0"
+                  className="minimal-button"
                 >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Parse
+                  Parse Again
                 </Button>
               )}
             </div>
-            <p className='text-xs text-muted-foreground'>
-              Upload your invoice PDF to automatically extract information
+            <p className='text-sm text-muted-foreground'>
+              Upload a PDF invoice to automatically extract all information
             </p>
             
-            {/* Parsing Status */}
-            {isParsing && (
-              <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    Parsing PDF...
-                  </span>
-                </div>
-                <Progress value={parseProgress} className="w-full" />
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  Extracting invoice data...
-                </p>
-              </div>
-            )}
-            
-            {/* Parsing Results */}
-            {parsedData && !isParsing && (
-              <div className={`space-y-2 p-3 rounded-lg border ${
-                parsedData.confidence > 0 
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                  : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {parsedData.confidence > 0 ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                  )}
-                  <span className={`text-sm font-medium ${
-                    parsedData.confidence > 0 
-                      ? 'text-green-800 dark:text-green-200'
-                      : 'text-red-800 dark:text-red-200'
-                  }`}>
-                    {parsedData.confidence > 0 ? 'PDF Parsed Successfully' : 'PDF Parsing Failed'}
-                  </span>
-                  {parsedData.confidence > 0 && (
-                    <Badge variant={parsedData.confidence > 70 ? "default" : "secondary"}>
-                      {parsedData.confidence}% confidence
-                    </Badge>
-                  )}
-                </div>
-                {parsedData.confidence > 0 ? (
-                  <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
-                    {parsedData.amount && <p>• Amount: ${parsedData.amount}</p>}
-                    {parsedData.dueDate && <p>• Due Date: {parsedData.dueDate}</p>}
-                    {parsedData.customerName && <p>• Customer: {parsedData.customerName}</p>}
-                    {parsedData.customerEmail && <p>• Email: {parsedData.customerEmail}</p>}
-                    {parsedData.invoiceNumber && <p>• Invoice #: {parsedData.invoiceNumber}</p>}
-                  </div>
-                ) : (
-                  <div className="text-xs text-red-700 dark:text-red-300">
-                    <p>• {parsedData.description}</p>
-                    <p>• Check browser console for detailed error information</p>
-                    <p>• Try uploading a different PDF or enter data manually</p>
-                  </div>
-                )}
-                {parsedData.confidence > 0 && parsedData.confidence < 50 && (
-                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="text-xs">Please verify the extracted data</span>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Sample PDF Link */}
+            <div className="pt-4">
+              <p className="text-sm text-muted-foreground mb-2">Need a sample? Try our demo invoice:</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={downloadSampleInvoice}
+                className="minimal-button"
+              >
+                📥 Download Sample Invoice
+              </Button>
+            </div>
           </div>
           
-          <div className="space-y-3">
-            <Button
-              type='submit'
-              disabled={isUploading}
-              className='w-full'
-              size="lg"
-            >
-              {isUploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  {invoiceData.file ? "Process PDF" : "Validate Form"}
-                </>
-              )}
-            </Button>
-            
-            <Button
-              type='button'
-              onClick={handleGetQuote}
-              disabled={isGettingQuote || !address || !isContractDeployed()}
-              className='w-full'
-              size="lg"
-            >
-              {isGettingQuote ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Getting Quote...
-                </>
-              ) : (
-                <>
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Get Factoring Quote
-                </>
-              )}
-            </Button>
-            
-            {!address && (
-              <p className="text-xs text-muted-foreground text-center">
-                Connect your wallet to get factoring quotes
-              </p>
-            )}
-            
-            {address && !isContractDeployed() && (
-              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                    Contract Not Deployed
-                  </span>
-                </div>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Please deploy the smart contract first. Check the deployment guide in the contracts folder.
-                </p>
+          {/* Parsing Status */}
+          {isParsing && (
+            <div className="space-y-4 p-6 bg-primary/5 rounded-2xl text-center">
+              <div className="flex items-center justify-center gap-3">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="text-lg font-medium text-primary">
+                  Parsing PDF...
+                </span>
               </div>
-            )}
+              <Progress value={parseProgress} className="w-full max-w-md mx-auto" />
+              <p className="text-sm text-muted-foreground">
+                Extracting invoice data...
+              </p>
+            </div>
+          )}
+          
+          {/* Parsing Results */}
+          {parsedData && !isParsing && (
+            <div className={`space-y-4 p-6 rounded-2xl ${
+              parsedData.confidence > 0 
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+            }`}>
+              <div className="flex items-center justify-center gap-3">
+                {parsedData.confidence > 0 ? (
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-6 w-6 text-red-600" />
+                )}
+                <span className={`text-lg font-medium ${
+                  parsedData.confidence > 0 
+                    ? 'text-green-800 dark:text-green-200'
+                    : 'text-red-800 dark:text-red-200'
+                }`}>
+                  {parsedData.confidence > 0 ? 'PDF Parsed Successfully!' : 'PDF Parsing Failed'}
+                </span>
+                {parsedData.confidence > 0 && (
+                  <Badge variant={parsedData.confidence > 70 ? "default" : "secondary"} className="text-sm">
+                    {parsedData.confidence}% confidence
+                  </Badge>
+                )}
+              </div>
+              {parsedData.confidence > 0 ? (
+                <div className="text-sm text-green-700 dark:text-green-300 space-y-2 text-center">
+                  {parsedData.amount && <p>✅ Amount: ${parsedData.amount}</p>}
+                  {parsedData.dueDate && <p>✅ Due Date: {parsedData.dueDate}</p>}
+                  {parsedData.customerName && <p>✅ Customer: {parsedData.customerName}</p>}
+                  {parsedData.customerEmail && <p>✅ Email: {parsedData.customerEmail}</p>}
+                  {parsedData.invoiceNumber && <p>✅ Invoice #: {parsedData.invoiceNumber}</p>}
+                </div>
+              ) : (
+                <div className="text-sm text-red-700 dark:text-red-300 text-center">
+                  <p>❌ {parsedData.description}</p>
+                  <p>Please try uploading a different PDF or enter data manually below.</p>
+                </div>
+              )}
+              {parsedData.confidence > 0 && parsedData.confidence < 50 && (
+                <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm">Please verify the extracted data below</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
+        {/* Form Fields - Auto-filled from PDF */}
+        <div className="space-y-6">
+          <div className="text-center">
+            <h3 className="text-2xl font-bold text-foreground mb-2">Invoice Details</h3>
+            <p className="text-muted-foreground">
+              {parsedData && parsedData.confidence > 0 
+                ? "Review and edit the extracted information below" 
+                : "Enter your invoice details manually"}
+            </p>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+          
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
+            <div className="space-y-3">
+              <Label htmlFor='amount' className='text-base font-medium text-foreground'>
+              Invoice Amount (USD) *
+              </Label>
+              <Input
+              type='number'
+              id='amount'
+              value={invoiceData.amount}
+              onChange={(e) => handleInputChange('amount', e.target.value)}
+              placeholder='10000'
+              step='0.01'
+              min='0'
+              required
+                className='minimal-input'
+            />
+          </div>
+          
+            <div className="space-y-3">
+              <Label htmlFor='dueDate' className='text-base font-medium text-foreground'>
+              Due Date *
+              </Label>
+              <Input
+              type='date'
+              id='dueDate'
+              value={invoiceData.dueDate}
+              onChange={(e) => handleInputChange('dueDate', e.target.value)}
+              required
+                className='minimal-input'
+            />
+          </div>
+        </div>
+        
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
+            <div className="space-y-3">
+              <Label htmlFor='customerName' className='text-base font-medium text-foreground'>
+              Customer Name *
+              </Label>
+              <Input
+              type='text'
+              id='customerName'
+              value={invoiceData.customerName}
+              onChange={(e) => handleInputChange('customerName', e.target.value)}
+              placeholder='Acme Corp'
+              required
+                className='minimal-input'
+            />
+          </div>
+          
+            <div className="space-y-3">
+              <Label htmlFor='customerEmail' className='text-base font-medium text-foreground'>
+              Customer Email *
+              </Label>
+              <Input
+              type='email'
+              id='customerEmail'
+              value={invoiceData.customerEmail}
+              onChange={(e) => handleInputChange('customerEmail', e.target.value)}
+              placeholder='billing@acme.com'
+              required
+                className='minimal-input'
+            />
+          </div>
+        </div>
+        
+          <div className="space-y-3">
+            <Label htmlFor='description' className='text-base font-medium text-foreground'>
+            Description
+            </Label>
+            <Textarea
+            id='description'
+            value={invoiceData.description}
+            onChange={(e) => handleInputChange('description', e.target.value)}
+            placeholder='Services rendered, products delivered, etc.'
+              rows={4}
+              className='minimal-input'
+          />
+        </div>
+        </div>
+        
+        <div className="flex flex-col gap-6 pt-8">
+          <Button
+          type='submit'
+          disabled={isUploading}
+            className='minimal-button w-full bg-primary text-primary-foreground hover:bg-primary/90'
+            size="lg"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Upload className="h-5 w-5 mr-3" />
+                {invoiceData.file ? "Process PDF" : "Validate Form"}
+              </>
+            )}
+          </Button>
+          
+          <Button
+            type='button'
+            onClick={handleGetQuote}
+            disabled={isGettingQuote || !address || !isContractDeployed()}
+            className='minimal-button w-full bg-secondary text-secondary-foreground hover:bg-secondary/80'
+            size="lg"
+          >
+            {isGettingQuote ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                Getting Quote...
+              </>
+            ) : (
+              <>
+                <DollarSign className="h-5 w-5 mr-3" />
+                Get Factoring Quote
+              </>
+            )}
+          </Button>
+          
+          {!address && (
+            <p className="text-sm text-muted-foreground text-center">
+              Connect your wallet to get factoring quotes
+            </p>
+          )}
+          
+          {address && !isContractDeployed() && (
+            <div className="p-6 bg-muted rounded-2xl">
+              <div className="flex items-center gap-3 mb-2">
+                <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                <span className="text-base font-medium text-foreground">
+                  Contract Not Deployed
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Please deploy the smart contract first. Check the deployment guide in the contracts folder.
+              </p>
+            </div>
+          )}
+        </div>
+      </form>
+    </div>
   );
 }

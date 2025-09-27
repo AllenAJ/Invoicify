@@ -14,6 +14,7 @@ import InvoiceFactor from "./components/InvoiceFactor";
 import BusinessRoute from "./components/BusinessRoute";
 import InvestorRoute from "./components/InvestorRoute";
 import CustomerRoute from "./components/CustomerRoute";
+import DashboardRoute from "./components/DashboardRoute";
 import { wagmiConfig } from "./config";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ export default function App() {
                 <Route path="/business" element={<BusinessRoute />} />
                 <Route path="/investor" element={<InvestorRoute />} />
                 <Route path="/customer" element={<CustomerRoute />} />
+                <Route path="/dashboard" element={<DashboardRoute />} />
               </Routes>
             </BrowserRouter>
             <Toaster

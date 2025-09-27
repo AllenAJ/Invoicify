@@ -37,65 +37,70 @@ export default function BusinessRoute() {
   };
 
   return (
-    <div className='container   p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
+    <div className='min-h-screen bg-background'>
       <Helmet>
         <title>Invoice Factor - For Business</title>
         <meta name='description' content='Sell your invoices for instant PYUSD payment' />
         <link rel='canonical' href='https://invoice-factor.example.com/business' />
       </Helmet>
       
-      <nav className='flex flex-row gap-4 items-center justify-between'>
-        <div>
-          <h1 className='text-xl font-black'>Invoice Factor</h1>
-          <p className='text-sm text-gray-500'>For Business Owners - Sell Your Invoices</p>
-        </div>
-        <div className='flex items-center gap-4'>
-          <Link 
-            to="/" 
-            className='text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300'
-          >
-            Home
-          </Link>
-          <Link 
-            to="/investor" 
-            className='text-sm text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300'
-          >
-            For Investors
-          </Link>
-          <Link 
-            to="/customer" 
-            className='text-sm text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300'
-          >
-            Pay Invoice
-          </Link>
-          <ConnectButton />
+      {/* Minimal Top Navigation */}
+      <nav className='minimal-nav'>
+        <div className='max-w-6xl mx-auto px-6 py-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-8'>
+              <Link to="/" className='text-2xl font-bold text-foreground'>
+                Invoice Factor
+              </Link>
+              <div className='hidden md:flex items-center gap-6'>
+                <Link to="/investor" className='text-muted-foreground hover:text-foreground transition-colors'>
+                  For Investors
+                </Link>
+                <Link to="/customer" className='text-muted-foreground hover:text-foreground transition-colors'>
+                  Pay Invoice
+                </Link>
+                <Link to="/dashboard" className='text-muted-foreground hover:text-foreground transition-colors'>
+                  Dashboard
+                </Link>
+              </div>
+            </div>
+            <ConnectButton />
+          </div>
         </div>
       </nav>
-      
-      <div className='flex-1'>
+
+      {/* Main Content */}
+      <main className='pt-24'>
         {isConnected ? (
-          <div className='space-y-8'>
-            {/* <WalletInfo />
-            <ContractStatus /> */}
-            {/* <UserProfile /> */}
+          <div className='minimal-section space-y-24'>
+            {/* Hero Section */}
+            <div className='text-center space-y-8'>
+              <h1 className='text-6xl font-bold text-foreground leading-tight'>
+                Sell Your Invoices
+                <br />
+                <span className='text-primary'>Instantly</span>
+              </h1>
+              <p className='text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed'>
+                Get immediate PYUSD payment for your outstanding invoices. 
+                No waiting, no hassle.
+              </p>
+            </div>
+
+            {/* User Status */}
+            {/* <div className='space-y-12'>
+              <UserProfile />
+              <WalletInfo />
+              <ContractStatus />
+            </div> */}
             
-            {/* Business Workflow Steps */}
-            <div className='space-y-6'>
-              <div className='text-center'>
-                <h2 className='text-2xl font-bold mb-2'>Sell Your Invoices for Instant PYUSD</h2>
-                <p className='text-gray-500'>
-                  Get immediate payment for your outstanding invoices
-                </p>
-              </div>
-              
-              {/* Step 1: Upload Invoice */}
+            {/* Main Workflow */}
+            <div className='space-y-16'>
               <InvoiceUpload 
                 onQuoteGenerated={handleQuoteGenerated}
                 onAcceptQuote={handleAcceptQuote}
                 isProcessing={isProcessing}
               />
               
-              {/* Step 2: Get Instant Quote & Accept */}
               <InstantQuote 
                 quoteData={quoteData}
                 invoiceAmount={invoiceAmount}
@@ -105,15 +110,21 @@ export default function BusinessRoute() {
             </div>
           </div>
         ) : (
-          <div className='text-center py-16'>
-            <h2 className='text-2xl font-bold mb-4'>Connect Your Business Wallet</h2>
-            <p className='text-gray-500 mb-8'>
-              Connect your PayPal/MetaMask wallet containing PYUSD to start selling invoices
-            </p>
-            <ConnectButton />
+          <div className='minimal-section text-center space-y-12'>
+            <div className='space-y-8'>
+              <h1 className='text-6xl font-bold text-foreground leading-tight'>
+                Connect Your Wallet
+              </h1>
+              <p className='text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed'>
+                Connect your wallet to start selling invoices for instant PYUSD payment
+              </p>
+            </div>
+            <div className='flex justify-center'>
+              <ConnectButton />
+            </div>
           </div>
         )}
-      </div>
+      </main>
       
       <Footer />
     </div>

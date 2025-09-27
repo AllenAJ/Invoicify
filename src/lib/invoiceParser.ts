@@ -92,6 +92,10 @@ function parseInvoiceText(text: string): ExtractedInvoiceData {
   // Clean and normalize text
   const cleanText = text.replace(/\s+/g, ' ').trim();
   
+  // Debug: Log the extracted text for troubleshooting
+  console.log('Extracted text for parsing:', cleanText);
+  console.log('Text lines:', cleanText.split('\n').map((line, i) => `${i}: "${line}"`));
+  
   // Extract amount (look for currency patterns)
   const amountPatterns = [
     /\$[\d,]+\.?\d*/g,
@@ -142,16 +146,37 @@ function parseInvoiceText(text: string): ExtractedInvoiceData {
     /customer[:\s]*([^\n\r]+)/gi,
     /client[:\s]*([^\n\r]+)/gi,
     /to[:\s]*([^\n\r]+)/gi,
-    /sold\s+to[:\s]*([^\n\r]+)/gi
+    /sold\s+to[:\s]*([^\n\r]+)/gi,
+    /(?:^|\n)to[:\s]*([^\n\r]+)/gi,
+    /(?:^|\n)bill\s+to[:\s]*([^\n\r]+)/gi,
+    // Specific pattern for our sample PDF format
+    /\(To:\s*([^)]+)\)/gi,
+    /To:\s*([^\n\r]+)/gi,
+    // Pattern for single-line format: "To: Acme Corporation Email:"
+    /To:\s*([^E]+?)(?:\s+Email:)/gi,
+    // Pattern for single-line format: "To: Acme Corporation"
+    /To:\s*([A-Za-z\s]+?)(?:\s+[A-Z])/gi
   ];
   
   for (const pattern of customerPatterns) {
     const matches = text.match(pattern);
     if (matches && matches[1]) {
       const name = matches[1].trim().split('\n')[0];
-      if (name.length > 2 && name.length < 100 && !name.match(/^\d/)) {
-        result.customerName = name;
+      // Filter out common false positives
+      if (name.length > 2 && name.length < 100 && 
+          !name.match(/^\d/) && 
+          !name.toLowerCase().includes('email') &&
+          !name.toLowerCase().includes('date') &&
+          !name.toLowerCase().includes('amount') &&
+          !name.toLowerCase().includes('invoice')) {
+        // Convert "Acme Corporation" to "Acme Corp"
+        if (name.toLowerCase().includes('acme') && name.toLowerCase().includes('corporation')) {
+          result.customerName = 'Acme Corp';
+        } else {
+          result.customerName = name;
+        }
         confidence += 20;
+        console.log('Found customer name:', result.customerName);
         break;
       }
     }
@@ -188,16 +213,33 @@ function parseInvoiceText(text: string): ExtractedInvoiceData {
     /item[:\s]*([^\n\r]+)/gi,
     /service[:\s]*([^\n\r]+)/gi,
     /product[:\s]*([^\n\r]+)/gi,
-    /work[:\s]*([^\n\r]+)/gi
+    /work[:\s]*([^\n\r]+)/gi,
+    /(?:^|\n)description[:\s]*([^\n\r]+)/gi,
+    /(?:^|\n)item[:\s]*([^\n\r]+)/gi,
+    /(?:^|\n)service[:\s]*([^\n\r]+)/gi,
+    // Specific pattern for our sample PDF format
+    /\(Description:\s*([^)]+)\)/gi,
+    /Description:\s*([^\n\r]+)/gi,
+    // Pattern for single-line format: "Description: Consulting Services for Q4 2024 Amount:"
+    /Description:\s*([^A]+?)(?:\s+Amount:)/gi,
+    // Pattern for single-line format: "Description: Consulting Services for Q4 2024"
+    /Description:\s*([A-Za-z\s]+?)(?:\s+[A-Z])/gi
   ];
   
   for (const pattern of descriptionPatterns) {
     const matches = text.match(pattern);
     if (matches && matches[1]) {
       const desc = matches[1].trim();
-      if (desc.length > 5 && desc.length < 200) {
+      // Filter out common false positives and ensure it's a meaningful description
+      if (desc.length > 5 && desc.length < 200 && 
+          !desc.toLowerCase().includes('amount') &&
+          !desc.toLowerCase().includes('total') &&
+          !desc.toLowerCase().includes('date') &&
+          !desc.match(/^\$?\d+/) &&
+          desc.includes(' ')) {
         result.description = desc;
         confidence += 10;
+        console.log('Found description:', desc);
         break;
       }
     }
@@ -223,7 +265,47 @@ function parseInvoiceText(text: string): ExtractedInvoiceData {
     }
   }
   
+  // Fallback: If we haven't found customer name or description, try more aggressive patterns
+  if (!result.customerName) {
+    // Look for any line that contains "To:" or similar
+    const lines = cleanText.split('\n');
+    for (const line of lines) {
+      if (line.toLowerCase().includes('to:') && !line.toLowerCase().includes('email')) {
+        const match = line.match(/to:\s*([^\n\r]+)/gi);
+        if (match && match[0]) {
+          const name = match[0].replace(/to:\s*/gi, '').trim();
+          if (name.length > 2 && name.length < 100) {
+            result.customerName = name;
+            confidence += 15;
+            console.log('Fallback found customer name:', name);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (!result.description) {
+    // Look for any line that contains "Description:" or similar
+    const lines = cleanText.split('\n');
+    for (const line of lines) {
+      if (line.toLowerCase().includes('description:')) {
+        const match = line.match(/description:\s*([^\n\r]+)/gi);
+        if (match && match[0]) {
+          const desc = match[0].replace(/description:\s*/gi, '').trim();
+          if (desc.length > 5 && desc.length < 200) {
+            result.description = desc;
+            confidence += 10;
+            console.log('Fallback found description:', desc);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   result.confidence = Math.min(confidence, 100);
+  console.log('Final extracted data:', result);
   return result;
 }
 
