@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, DollarSign, Calendar, User, Mail } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Upload, FileText, DollarSign, Calendar, User, Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { extractInvoiceData, ExtractedInvoiceData } from "@/lib/invoiceParser";
 
 interface InvoiceData {
   amount: string;
@@ -26,16 +28,103 @@ export default function InvoiceUpload() {
     description: "",
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsedData, setParsedData] = useState<ExtractedInvoiceData | null>(null);
+  const [parseProgress, setParseProgress] = useState(0);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && file.type === 'application/pdf') {
       setInvoiceData(prev => ({ ...prev, file }));
+      
+      // Auto-parse the PDF
+      setIsParsing(true);
+      setParseProgress(0);
+      
+      try {
+        // Simulate progress
+        const progressInterval = setInterval(() => {
+          setParseProgress(prev => Math.min(prev + 10, 90));
+        }, 200);
+        
+        const extracted = await extractInvoiceData(file);
+        
+        clearInterval(progressInterval);
+        setParseProgress(100);
+        
+        setParsedData(extracted);
+        
+        // Auto-fill form with extracted data
+        if (extracted.confidence > 30) {
+          setInvoiceData(prev => ({
+            ...prev,
+            amount: extracted.amount || prev.amount,
+            dueDate: extracted.dueDate || prev.dueDate,
+            customerName: extracted.customerName || prev.customerName,
+            customerEmail: extracted.customerEmail || prev.customerEmail,
+            description: extracted.description || prev.description,
+          }));
+          
+          toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+        } else {
+          toast.warning("Invoice parsed with low confidence. Please verify the extracted data.");
+        }
+      } catch (error) {
+        toast.error("Failed to parse PDF. Please fill in the form manually.");
+      } finally {
+        setIsParsing(false);
+        setTimeout(() => setParseProgress(0), 1000);
+      }
+    } else if (file) {
+      toast.error("Please upload a PDF file.");
     }
   };
 
   const handleInputChange = (field: keyof InvoiceData, value: string) => {
     setInvoiceData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleManualParse = async () => {
+    if (!invoiceData.file) {
+      toast.error("Please select a PDF file first");
+      return;
+    }
+    
+    setIsParsing(true);
+    setParseProgress(0);
+    
+    try {
+      const progressInterval = setInterval(() => {
+        setParseProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+      
+      const extracted = await extractInvoiceData(invoiceData.file);
+      
+      clearInterval(progressInterval);
+      setParseProgress(100);
+      
+      setParsedData(extracted);
+      
+      if (extracted.confidence > 30) {
+        setInvoiceData(prev => ({
+          ...prev,
+          amount: extracted.amount || prev.amount,
+          dueDate: extracted.dueDate || prev.dueDate,
+          customerName: extracted.customerName || prev.customerName,
+          customerEmail: extracted.customerEmail || prev.customerEmail,
+          description: extracted.description || prev.description,
+        }));
+        
+        toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+      } else {
+        toast.warning("Invoice parsed with low confidence. Please verify the extracted data.");
+      }
+    } catch (error) {
+      toast.error("Failed to parse PDF. Please fill in the form manually.");
+    } finally {
+      setIsParsing(false);
+      setTimeout(() => setParseProgress(0), 1000);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,17 +258,77 @@ export default function InvoiceUpload() {
           <div className="space-y-2">
             <Label htmlFor='file' className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Invoice PDF (Optional)
+              Invoice PDF (Auto-Parse)
             </Label>
-            <Input
-              type='file'
-              id='file'
-              accept='.pdf'
-              onChange={handleFileChange}
-            />
+            <div className="flex gap-2">
+              <Input
+                type='file'
+                id='file'
+                accept='.pdf'
+                onChange={handleFileChange}
+                disabled={isParsing}
+                className="flex-1"
+              />
+              {invoiceData.file && !isParsing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleManualParse}
+                  className="shrink-0"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Parse
+                </Button>
+              )}
+            </div>
             <p className='text-xs text-muted-foreground'>
-              Upload your invoice PDF for faster processing
+              Upload your invoice PDF to automatically extract information
             </p>
+            
+            {/* Parsing Status */}
+            {isParsing && (
+              <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Parsing PDF...
+                  </span>
+                </div>
+                <Progress value={parseProgress} className="w-full" />
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  Extracting invoice data...
+                </p>
+              </div>
+            )}
+            
+            {/* Parsing Results */}
+            {parsedData && !isParsing && (
+              <div className="space-y-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                    PDF Parsed Successfully
+                  </span>
+                  <Badge variant={parsedData.confidence > 70 ? "default" : "secondary"}>
+                    {parsedData.confidence}% confidence
+                  </Badge>
+                </div>
+                <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
+                  {parsedData.amount && <p>• Amount: ${parsedData.amount}</p>}
+                  {parsedData.dueDate && <p>• Due Date: {parsedData.dueDate}</p>}
+                  {parsedData.customerName && <p>• Customer: {parsedData.customerName}</p>}
+                  {parsedData.customerEmail && <p>• Email: {parsedData.customerEmail}</p>}
+                  {parsedData.invoiceNumber && <p>• Invoice #: {parsedData.invoiceNumber}</p>}
+                </div>
+                {parsedData.confidence < 50 && (
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="text-xs">Please verify the extracted data</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <Button

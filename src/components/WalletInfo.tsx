@@ -49,7 +49,7 @@ export default function WalletInfo() {
                 <Badge variant="secondary">{paymentToken.data.symbol} Balance</Badge>
               </div>
               <p className="text-lg font-semibold">
-                {formatUnits(paymentTokenBalance.data, paymentToken.data.decimals)} {paymentToken.data.symbol}
+                {paymentTokenBalance.data ? formatUnits(paymentTokenBalance.data, paymentToken.data.decimals) : '0'} {paymentToken.data.symbol}
               </p>
             </div>
           )}
