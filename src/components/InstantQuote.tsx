@@ -1,100 +1,24 @@
-import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { Calculator, CheckCircle, Loader2, DollarSign, Calendar, Shield, Percent } from "lucide-react";
 
-interface QuoteData {
-  invoiceAmount: number;
-  offerAmount: number;
-  discountRate: number;
-  processingFee: number;
-  netAmount: number;
-  dueDate: string;
-  riskScore: string;
-  status: 'calculating' | 'ready' | 'error';
+interface InstantQuoteProps {
+  quoteData?: {
+    factorAmount: string;
+    fee: string;
+    netAmount: string;
+    dueDate: string;
+  } | null;
+  invoiceAmount?: string;
+  onAcceptQuote?: () => void;
+  isProcessing?: boolean;
 }
 
-export default function InstantQuote() {
-  const [quoteData, setQuoteData] = useState<QuoteData | null>(null);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [progress, setProgress] = useState(0);
+export default function InstantQuote({ quoteData: propQuoteData, invoiceAmount, onAcceptQuote, isProcessing }: InstantQuoteProps) {
 
-  // Simulate getting a quote when component mounts
-  useEffect(() => {
-    const calculateQuote = async () => {
-      setIsCalculating(true);
-      setProgress(0);
-      
-      // Simulate progress
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setProgress(i);
-      }
-      
-      // Mock quote calculation
-      const invoiceAmount = 10000; // Example amount
-      const discountRate = 0.02; // 2% per month
-      const processingFee = 0.005; // 0.5% processing fee
-      const monthsToDue = 1; // Assume 1 month to due date
-      
-      const discountAmount = invoiceAmount * discountRate * monthsToDue;
-      const feeAmount = invoiceAmount * processingFee;
-      const netAmount = invoiceAmount - discountAmount - feeAmount;
-      
-      setQuoteData({
-        invoiceAmount,
-        offerAmount: netAmount,
-        discountRate: discountRate * 100,
-        processingFee: processingFee * 100,
-        netAmount,
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
-        riskScore: 'Low',
-        status: 'ready'
-      });
-      
-      setIsCalculating(false);
-    };
-
-    calculateQuote();
-  }, []);
-
-  if (isCalculating) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            <div className='w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold'>
-              2
-            </div>
-            <div className="flex items-center gap-2">
-              <Calculator className="h-5 w-5" />
-              Get Instant Quote
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className='text-center py-8 space-y-4'>
-            <div className="space-y-2">
-              <Progress value={progress} className="w-full" />
-              <p className='text-sm text-muted-foreground'>{progress}% Complete</p>
-            </div>
-            <div className="flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-            <div>
-              <p className='text-foreground font-medium'>Calculating your instant quote...</p>
-              <p className='text-sm text-muted-foreground mt-1'>
-                Analyzing invoice details and risk factors
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!quoteData) {
+  // Only show quote if real data is provided
+  if (!propQuoteData) {
     return (
       <Card>
         <CardHeader>
@@ -110,12 +34,24 @@ export default function InstantQuote() {
         </CardHeader>
         <CardContent>
           <div className='text-center py-8'>
-            <p className='text-muted-foreground'>Upload an invoice to get your instant quote</p>
+            <p className='text-muted-foreground'>Upload an invoice and click "Get Factoring Quote" to see your instant quote</p>
           </div>
         </CardContent>
       </Card>
     );
   }
+
+  // Convert prop data to display format
+  const displayQuoteData = {
+    invoiceAmount: parseFloat(invoiceAmount || '0'),
+    offerAmount: parseFloat(propQuoteData.factorAmount),
+    discountRate: 2, // 2% fee
+    processingFee: 0, // No additional processing fee
+    netAmount: parseFloat(propQuoteData.netAmount),
+    dueDate: propQuoteData.dueDate,
+    riskScore: 'Low',
+    status: 'ready' as const
+  };
 
   return (
     <Card className="border-green-200 dark:border-green-800">
@@ -135,10 +71,10 @@ export default function InstantQuote() {
           <div className='text-center space-y-2'>
             <p className='text-sm text-muted-foreground'>We'll pay you</p>
             <p className='text-4xl font-bold text-green-600 dark:text-green-400'>
-              ${quoteData.offerAmount.toLocaleString()} PYUSD
+              ${displayQuoteData.offerAmount.toLocaleString()} PYUSD
             </p>
             <p className='text-sm text-muted-foreground'>
-              for your ${quoteData.invoiceAmount.toLocaleString()} invoice
+              for your ${displayQuoteData.invoiceAmount.toLocaleString()} invoice
             </p>
           </div>
         </div>
@@ -150,23 +86,23 @@ export default function InstantQuote() {
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                 <span className='text-sm font-medium'>Invoice Amount</span>
               </div>
-              <span className='font-semibold'>${quoteData.invoiceAmount.toLocaleString()}</span>
+              <span className='font-semibold'>${displayQuoteData.invoiceAmount.toLocaleString()}</span>
             </div>
             
             <div className='flex items-center justify-between p-3 bg-muted rounded-lg'>
               <div className="flex items-center gap-2">
                 <Percent className="h-4 w-4 text-muted-foreground" />
-                <span className='text-sm font-medium'>Discount Rate</span>
+                <span className='text-sm font-medium'>Factoring Fee</span>
               </div>
-              <span className='font-semibold'>{quoteData.discountRate}%</span>
+              <span className='font-semibold'>{displayQuoteData.discountRate}%</span>
             </div>
             
             <div className='flex items-center justify-between p-3 bg-muted rounded-lg'>
               <div className="flex items-center gap-2">
-                <Percent className="h-4 w-4 text-muted-foreground" />
-                <span className='text-sm font-medium'>Processing Fee</span>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <span className='text-sm font-medium'>Advance Amount</span>
               </div>
-              <span className='font-semibold'>{quoteData.processingFee}%</span>
+              <span className='font-semibold'>${displayQuoteData.offerAmount.toLocaleString()}</span>
             </div>
           </div>
           
@@ -176,7 +112,7 @@ export default function InstantQuote() {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className='text-sm font-medium'>Due Date</span>
               </div>
-              <span className='font-semibold'>{new Date(quoteData.dueDate).toLocaleDateString()}</span>
+              <span className='font-semibold'>{new Date(displayQuoteData.dueDate).toLocaleDateString()}</span>
             </div>
             
             <div className='flex items-center justify-between p-3 bg-muted rounded-lg'>
@@ -184,8 +120,8 @@ export default function InstantQuote() {
                 <Shield className="h-4 w-4 text-muted-foreground" />
                 <span className='text-sm font-medium'>Risk Score</span>
               </div>
-              <Badge variant={quoteData.riskScore === 'Low' ? 'default' : 'secondary'}>
-                {quoteData.riskScore}
+              <Badge variant={displayQuoteData.riskScore === 'Low' ? 'default' : 'secondary'}>
+                {displayQuoteData.riskScore}
               </Badge>
             </div>
             
@@ -194,7 +130,7 @@ export default function InstantQuote() {
                 <DollarSign className="h-4 w-4 text-primary" />
                 <span className='text-sm font-medium text-primary'>Net Amount</span>
               </div>
-              <span className='font-bold text-lg text-primary'>${quoteData.netAmount.toLocaleString()}</span>
+              <span className='font-bold text-lg text-primary'>${displayQuoteData.netAmount.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -207,11 +143,11 @@ export default function InstantQuote() {
           <ul className='text-sm text-blue-700 dark:text-blue-300 space-y-2'>
             <li className="flex items-start gap-2">
               <span className="text-blue-500 mt-1">•</span>
-              <span>You receive ${quoteData.offerAmount.toLocaleString()} PYUSD immediately</span>
+              <span>You receive ${displayQuoteData.offerAmount.toLocaleString()} PYUSD immediately</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-blue-500 mt-1">•</span>
-              <span>We collect the full ${quoteData.invoiceAmount.toLocaleString()} from your customer</span>
+              <span>We collect the full ${displayQuoteData.invoiceAmount.toLocaleString()} from your customer</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-blue-500 mt-1">•</span>
@@ -223,6 +159,27 @@ export default function InstantQuote() {
             </li>
           </ul>
         </div>
+
+        {propQuoteData && onAcceptQuote && (
+          <Button
+            onClick={onAcceptQuote}
+            disabled={isProcessing}
+            className="w-full"
+            size="lg"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Storing Invoice & Processing...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Accept Quote & Get PYUSD
+              </>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

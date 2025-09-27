@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
@@ -6,13 +7,37 @@ import Footer from "./Footer";
 import WalletInfo from "./WalletInfo";
 import InvoiceUpload from "./InvoiceUpload";
 import InstantQuote from "./InstantQuote";
-import AcceptOffer from "./AcceptOffer";
+import ContractStatus from "./ContractStatus";
+import UserProfile from "./UserProfile";
 
 export default function BusinessRoute() {
   const { isConnected } = useAccount();
+  const [quoteData, setQuoteData] = useState<{
+    factorAmount: string;
+    fee: string;
+    netAmount: string;
+    dueDate: string;
+  } | null>(null);
+  const [invoiceAmount, setInvoiceAmount] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleQuoteGenerated = (quote: typeof quoteData, amount: string) => {
+    setQuoteData(quote);
+    setInvoiceAmount(amount);
+  };
+
+  const handleAcceptQuote = () => {
+    setIsProcessing(true);
+    // Reset after processing
+    setTimeout(() => {
+      setQuoteData(null);
+      setInvoiceAmount("");
+      setIsProcessing(false);
+    }, 2000);
+  };
 
   return (
-    <div className='container max-w-4xl p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
+    <div className='container   p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
       <Helmet>
         <title>Invoice Factor - For Business</title>
         <meta name='description' content='Sell your invoices for instant PYUSD payment' />
@@ -50,7 +75,9 @@ export default function BusinessRoute() {
       <div className='flex-1'>
         {isConnected ? (
           <div className='space-y-8'>
-            <WalletInfo />
+            {/* <WalletInfo />
+            <ContractStatus /> */}
+            {/* <UserProfile /> */}
             
             {/* Business Workflow Steps */}
             <div className='space-y-6'>
@@ -62,13 +89,19 @@ export default function BusinessRoute() {
               </div>
               
               {/* Step 1: Upload Invoice */}
-              <InvoiceUpload />
+              <InvoiceUpload 
+                onQuoteGenerated={handleQuoteGenerated}
+                onAcceptQuote={handleAcceptQuote}
+                isProcessing={isProcessing}
+              />
               
-              {/* Step 2: Get Instant Quote */}
-              <InstantQuote />
-              
-              {/* Step 3: Accept Offer */}
-              <AcceptOffer />
+              {/* Step 2: Get Instant Quote & Accept */}
+              <InstantQuote 
+                quoteData={quoteData}
+                invoiceAmount={invoiceAmount}
+                onAcceptQuote={handleAcceptQuote}
+                isProcessing={isProcessing}
+              />
             </div>
           </div>
         ) : (

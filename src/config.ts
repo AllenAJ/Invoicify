@@ -6,8 +6,8 @@ export function paymentTokenAddress(chain: Chain | undefined): Address {
   switch (chain) {
     case undefined:
     case sepolia:
-      // PYUSD Sepolia
-      return "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
+      // PYUSD ETH Sepolia
+      return "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8";
     default:
       throw new Error(
         `Payment token address not configured for chain ${chain}`

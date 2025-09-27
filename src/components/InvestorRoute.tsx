@@ -13,7 +13,7 @@ export default function InvestorRoute() {
   const { isConnected } = useAccount();
 
   return (
-    <div className='container max-w-4xl p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
+    <div className='container   p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
       <Helmet>
         <title>Invoice Factor - For Investors</title>
         <meta name='description' content='Earn yield by providing PYUSD liquidity for invoice factoring' />

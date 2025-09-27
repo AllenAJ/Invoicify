@@ -10,7 +10,7 @@ export default function InvoiceFactor() {
   const { isConnected } = useAccount();
 
   return (
-    <div className='container max-w-4xl p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
+    <div className='container   p-4 md:p-8 mx-auto flex flex-col min-h-screen gap-8'>
       <Helmet>
         <title>Invoice Factor</title>
         <meta name='description' content='Invoice factoring with PYUSD on Sepolia' />

@@ -9,6 +9,22 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, DollarSign, Calendar, User, Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { extractInvoiceData, ExtractedInvoiceData } from "@/lib/invoiceParser";
+import { useInvoiceFactoring } from "@/hooks/invoiceFactoring";
+import { isContractDeployed } from "@/config/contract";
+import { useAccount } from "wagmi";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useInvoices } from "@/hooks/useInvoices";
+
+interface InvoiceUploadProps {
+  onQuoteGenerated?: (quoteData: {
+    factorAmount: string;
+    fee: string;
+    netAmount: string;
+    dueDate: string;
+  }, invoiceAmount: string) => void;
+  onAcceptQuote?: () => void;
+  isProcessing?: boolean;
+}
 
 interface InvoiceData {
   amount: string;
@@ -19,7 +35,12 @@ interface InvoiceData {
   file?: File;
 }
 
-export default function InvoiceUpload() {
+export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: InvoiceUploadProps) {
+  const { address } = useAccount();
+  const { createInvoiceFromData } = useInvoiceFactoring();
+  const { user } = useSupabaseAuth();
+  const { createInvoice, uploadPDF, createInvoiceFactoring } = useInvoices(user?.id);
+  
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     amount: "",
     dueDate: "",
@@ -31,6 +52,13 @@ export default function InvoiceUpload() {
   const [isParsing, setIsParsing] = useState(false);
   const [parsedData, setParsedData] = useState<ExtractedInvoiceData | null>(null);
   const [parseProgress, setParseProgress] = useState(0);
+  const [isGettingQuote, setIsGettingQuote] = useState(false);
+  const [quoteData, setQuoteData] = useState<{
+    factorAmount: string;
+    fee: string;
+    netAmount: string;
+    dueDate: string;
+  } | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,8 +82,11 @@ export default function InvoiceUpload() {
         
         setParsedData(extracted);
         
-        // Auto-fill form with extracted data
-        if (extracted.confidence > 30) {
+        // Auto-fill form with extracted data (always try to fill if any data is available)
+        const hasAnyData = extracted.amount || extracted.dueDate || extracted.customerName || 
+                          extracted.customerEmail || extracted.description || extracted.invoiceNumber;
+        
+        if (hasAnyData) {
           setInvoiceData(prev => ({
             ...prev,
             amount: extracted.amount || prev.amount,
@@ -65,9 +96,17 @@ export default function InvoiceUpload() {
             description: extracted.description || prev.description,
           }));
           
-          toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+          if (extracted.confidence > 70) {
+            toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+          } else if (extracted.confidence > 30) {
+            toast.success(`Invoice parsed with good confidence! (${extracted.confidence}% confidence)`);
+          } else if (extracted.confidence > 0) {
+            toast.error(`Some data extracted (${extracted.confidence}% confidence). Please verify and complete manually.`);
+          } else {
+            toast.error("Limited data extracted. Please verify and complete manually.");
+          }
         } else {
-          toast.warning("Invoice parsed with low confidence. Please verify the extracted data.");
+          toast.error("No data could be extracted from the PDF. Please enter data manually.");
         }
       } catch (error) {
         toast.error("Failed to parse PDF. Please fill in the form manually.");
@@ -105,7 +144,11 @@ export default function InvoiceUpload() {
       
       setParsedData(extracted);
       
-      if (extracted.confidence > 30) {
+      // Auto-fill form with extracted data (always try to fill if any data is available)
+      const hasAnyData = extracted.amount || extracted.dueDate || extracted.customerName || 
+                        extracted.customerEmail || extracted.description || extracted.invoiceNumber;
+      
+      if (hasAnyData) {
         setInvoiceData(prev => ({
           ...prev,
           amount: extracted.amount || prev.amount,
@@ -115,9 +158,17 @@ export default function InvoiceUpload() {
           description: extracted.description || prev.description,
         }));
         
-        toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+        if (extracted.confidence > 70) {
+          toast.success(`Invoice parsed successfully! (${extracted.confidence}% confidence)`);
+        } else if (extracted.confidence > 30) {
+          toast.success(`Invoice parsed with good confidence! (${extracted.confidence}% confidence)`);
+        } else if (extracted.confidence > 0) {
+          toast.error(`Some data extracted (${extracted.confidence}% confidence). Please verify and complete manually.`);
+        } else {
+          toast.error("Limited data extracted. Please verify and complete manually.");
+        }
       } else {
-        toast.warning("Invoice parsed with low confidence. Please verify the extracted data.");
+        toast.error("No data could be extracted from the PDF. Please enter data manually.");
       }
     } catch (error) {
       toast.error("Failed to parse PDF. Please fill in the form manually.");
@@ -127,21 +178,107 @@ export default function InvoiceUpload() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!invoiceData.amount || !invoiceData.dueDate || !invoiceData.customerName || !invoiceData.customerEmail) {
+  const handleGetQuote = async () => {
+    if (!address) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    if (!isContractDeployed()) {
+      toast.error("Smart contract not deployed yet. Please deploy the contract first.");
+      return;
+    }
+
+    if (!invoiceData.amount || !invoiceData.dueDate || !invoiceData.customerName || !invoiceData.description) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    setIsUploading(true);
+    setIsGettingQuote(true);
     
     try {
-      // Simulate upload process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Calculate quote (80% advance, 2% fee)
+      const amount = parseFloat(invoiceData.amount);
+      const factorAmount = amount * 0.80; // 80% advance
+      const fee = amount * 0.02; // 2% fee
+      const netAmount = factorAmount - fee; // Net amount to business
       
-      toast.success("Invoice uploaded successfully!");
+      const quote = {
+        factorAmount: factorAmount.toFixed(2),
+        fee: fee.toFixed(2),
+        netAmount: netAmount.toFixed(2),
+        dueDate: invoiceData.dueDate,
+      };
+      
+      setQuoteData(quote);
+      onQuoteGenerated?.(quote, invoiceData.amount);
+      toast.success("Quote generated! Review the terms in the quote section below.");
+      
+    } catch (error: any) {
+      console.error("Error getting quote:", error);
+      toast.error("Failed to generate quote. Please try again.");
+    } finally {
+      setIsGettingQuote(false);
+    }
+  };
+
+  const handleAcceptQuote = async () => {
+    if (!address || !quoteData || !user) {
+      toast.error("Please connect your wallet and get a quote first");
+      return;
+    }
+    
+    try {
+      // Upload PDF to Supabase if file exists
+      let pdfUrl = "";
+      if (invoiceData.file) {
+        pdfUrl = await uploadPDF(invoiceData.file, user.id);
+      }
+
+      // Save invoice to Supabase
+      const savedInvoice = await createInvoice({
+        user_id: user.id,
+        invoice_number: parsedData?.invoiceNumber || `INV-${Date.now()}`,
+        amount: parseFloat(invoiceData.amount),
+        due_date: invoiceData.dueDate,
+        customer_name: invoiceData.customerName,
+        customer_email: invoiceData.customerEmail,
+        description: invoiceData.description,
+        pdf_url: pdfUrl,
+        pdf_filename: invoiceData.file?.name,
+        status: 'created'
+      });
+
+      // Create invoice factoring record
+      await createInvoiceFactoring({
+        invoice_id: savedInvoice.id,
+        user_id: user.id,
+        factor_amount: parseFloat(quoteData.factorAmount),
+        factor_fee: parseFloat(quoteData.fee),
+        net_amount: parseFloat(quoteData.netAmount),
+        status: 'pending'
+      });
+
+      // For now, we'll use a placeholder customer address
+      // In a real app, you'd need to resolve the customer email to an address
+      const customerAddress = "0x0000000000000000000000000000000000000000"; // Placeholder
+      
+      // Create invoice on blockchain and factor it
+      const blockchainInvoiceId = await createInvoiceFromData({
+        customer: customerAddress,
+        amount: invoiceData.amount,
+        dueDate: invoiceData.dueDate,
+        description: invoiceData.description,
+      });
+
+      // Update invoice with blockchain ID
+      await createInvoice({
+        ...savedInvoice,
+        blockchain_invoice_id: blockchainInvoiceId,
+        status: 'factored'
+      });
+
+      toast.success("Invoice created and factored successfully! You'll receive PYUSD shortly.");
       
       // Reset form
       setInvoiceData({
@@ -151,8 +288,42 @@ export default function InvoiceUpload() {
         customerEmail: "",
         description: "",
       });
+      setParsedData(null);
+      setQuoteData(null);
+      
+      // Call the parent's accept quote handler
+      onAcceptQuote?.();
+    } catch (error: any) {
+      console.error("Error accepting quote:", error);
+      const errorMessage = error?.message || "Failed to accept quote. Please try again.";
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // If there's a PDF file, process it
+    if (invoiceData.file) {
+      await handleManualParse();
+      return;
+    }
+    
+    // If no file, just validate the form
+    if (!invoiceData.amount || !invoiceData.dueDate || !invoiceData.customerName || !invoiceData.customerEmail) {
+      toast.error("Please fill in all required fields or upload a PDF file");
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      // Simulate upload process for manual entry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast.success("Invoice data ready! You can now create it on the blockchain.");
     } catch (error) {
-      toast.error("Failed to upload invoice");
+      toast.error("Failed to process invoice data");
     } finally {
       setIsUploading(false);
     }
@@ -304,24 +475,46 @@ export default function InvoiceUpload() {
             
             {/* Parsing Results */}
             {parsedData && !isParsing && (
-              <div className="space-y-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div className={`space-y-2 p-3 rounded-lg border ${
+                parsedData.confidence > 0 
+                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+              }`}>
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                    PDF Parsed Successfully
+                  {parsedData.confidence > 0 ? (
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                  )}
+                  <span className={`text-sm font-medium ${
+                    parsedData.confidence > 0 
+                      ? 'text-green-800 dark:text-green-200'
+                      : 'text-red-800 dark:text-red-200'
+                  }`}>
+                    {parsedData.confidence > 0 ? 'PDF Parsed Successfully' : 'PDF Parsing Failed'}
                   </span>
-                  <Badge variant={parsedData.confidence > 70 ? "default" : "secondary"}>
-                    {parsedData.confidence}% confidence
-                  </Badge>
+                  {parsedData.confidence > 0 && (
+                    <Badge variant={parsedData.confidence > 70 ? "default" : "secondary"}>
+                      {parsedData.confidence}% confidence
+                    </Badge>
+                  )}
                 </div>
-                <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
-                  {parsedData.amount && <p>• Amount: ${parsedData.amount}</p>}
-                  {parsedData.dueDate && <p>• Due Date: {parsedData.dueDate}</p>}
-                  {parsedData.customerName && <p>• Customer: {parsedData.customerName}</p>}
-                  {parsedData.customerEmail && <p>• Email: {parsedData.customerEmail}</p>}
-                  {parsedData.invoiceNumber && <p>• Invoice #: {parsedData.invoiceNumber}</p>}
-                </div>
-                {parsedData.confidence < 50 && (
+                {parsedData.confidence > 0 ? (
+                  <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
+                    {parsedData.amount && <p>• Amount: ${parsedData.amount}</p>}
+                    {parsedData.dueDate && <p>• Due Date: {parsedData.dueDate}</p>}
+                    {parsedData.customerName && <p>• Customer: {parsedData.customerName}</p>}
+                    {parsedData.customerEmail && <p>• Email: {parsedData.customerEmail}</p>}
+                    {parsedData.invoiceNumber && <p>• Invoice #: {parsedData.invoiceNumber}</p>}
+                  </div>
+                ) : (
+                  <div className="text-xs text-red-700 dark:text-red-300">
+                    <p>• {parsedData.description}</p>
+                    <p>• Check browser console for detailed error information</p>
+                    <p>• Try uploading a different PDF or enter data manually</p>
+                  </div>
+                )}
+                {parsedData.confidence > 0 && parsedData.confidence < 50 && (
                   <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                     <AlertCircle className="h-4 w-4" />
                     <span className="text-xs">Please verify the extracted data</span>
@@ -331,24 +524,67 @@ export default function InvoiceUpload() {
             )}
           </div>
           
-          <Button
-            type='submit'
-            disabled={isUploading}
-            className='w-full'
-            size="lg"
-          >
-            {isUploading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Invoice
-              </>
+          <div className="space-y-3">
+            <Button
+              type='submit'
+              disabled={isUploading}
+              className='w-full'
+              size="lg"
+            >
+              {isUploading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {invoiceData.file ? "Process PDF" : "Validate Form"}
+                </>
+              )}
+            </Button>
+            
+            <Button
+              type='button'
+              onClick={handleGetQuote}
+              disabled={isGettingQuote || !address || !isContractDeployed()}
+              className='w-full'
+              size="lg"
+            >
+              {isGettingQuote ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Getting Quote...
+                </>
+              ) : (
+                <>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Get Factoring Quote
+                </>
+              )}
+            </Button>
+            
+            {!address && (
+              <p className="text-xs text-muted-foreground text-center">
+                Connect your wallet to get factoring quotes
+              </p>
             )}
-          </Button>
+            
+            {address && !isContractDeployed() && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Contract Not Deployed
+                  </span>
+                </div>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Please deploy the smart contract first. Check the deployment guide in the contracts folder.
+                </p>
+              </div>
+            )}
+
+          </div>
         </form>
       </CardContent>
     </Card>
