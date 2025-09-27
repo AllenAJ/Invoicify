@@ -2,6 +2,9 @@ import { formatUnits } from "viem";
 import { useAccount, useBalance } from "wagmi";
 import { useToken, useTokenBalance } from "../hooks/erc20";
 import { usePaymentTokenAddress } from "../hooks/paymentToken";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Wallet, Coins, DollarSign } from "lucide-react";
 
 export default function WalletInfo() {
   const { address } = useAccount();
@@ -11,29 +14,47 @@ export default function WalletInfo() {
   const nativeBalance = useBalance({ address });
 
   return (
-    <div className='bg-white dark:bg-zinc-700 p-6 rounded-lg border-2 border-zinc-300 dark:border-zinc-600'>
-      <h2 className='text-lg font-bold mb-4'>Wallet Information</h2>
-      
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-sm'>
-        <div>
-          <span className='text-gray-500'>Address:</span>
-          <p className='font-mono text-xs break-all'>{address}</p>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Wallet className="h-5 w-5" />
+          Wallet Information
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">Address</Badge>
+            </div>
+            <p className='font-mono text-sm break-all text-muted-foreground'>{address}</p>
+          </div>
+          
+          {nativeBalance.data && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4" />
+                <Badge variant="secondary">ETH Balance</Badge>
+              </div>
+              <p className="text-lg font-semibold">
+                {formatUnits(nativeBalance.data.value, nativeBalance.data.decimals)} {nativeBalance.data.symbol}
+              </p>
+            </div>
+          )}
+          
+          {paymentToken.data && paymentTokenBalance.data && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <Badge variant="secondary">{paymentToken.data.symbol} Balance</Badge>
+              </div>
+              <p className="text-lg font-semibold">
+                {formatUnits(paymentTokenBalance.data, paymentToken.data.decimals)} {paymentToken.data.symbol}
+              </p>
+            </div>
+          )}
         </div>
-        
-        {nativeBalance.data && (
-          <div>
-            <span className='text-gray-500'>ETH Balance:</span>
-            <p>{formatUnits(nativeBalance.data.value, nativeBalance.data.decimals)} {nativeBalance.data.symbol}</p>
-          </div>
-        )}
-        
-        {paymentToken.data && paymentTokenBalance.data && (
-          <div>
-            <span className='text-gray-500'>{paymentToken.data.symbol} Balance:</span>
-            <p>{formatUnits(paymentTokenBalance.data, paymentToken.data.decimals)} {paymentToken.data.symbol}</p>
-          </div>
-        )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

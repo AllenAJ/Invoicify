@@ -1,5 +1,12 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Upload, FileText, DollarSign, Calendar, User, Mail } from "lucide-react";
 
 interface InvoiceData {
   amount: string;
@@ -63,122 +70,138 @@ export default function InvoiceUpload() {
   };
 
   return (
-    <div className='bg-white dark:bg-zinc-700 p-6 rounded-lg border-2 border-zinc-300 dark:border-zinc-600'>
-      <div className='flex items-center gap-3 mb-4'>
-        <div className='w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold'>
-          1
-        </div>
-        <h3 className='text-lg font-bold'>Upload Invoice</h3>
-      </div>
-      
-      <p className='text-gray-500 mb-6'>
-        Upload your invoice PDF and provide customer details to get an instant quote
-      </p>
-      
-      <form onSubmit={handleSubmit} className='space-y-4'>
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-          <div>
-            <label htmlFor='amount' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-              Invoice Amount (USD) *
-            </label>
-            <input
-              type='number'
-              id='amount'
-              value={invoiceData.amount}
-              onChange={(e) => handleInputChange('amount', e.target.value)}
-              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100'
-              placeholder='10000'
-              step='0.01'
-              min='0'
-              required
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-3">
+          <div className='w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold'>
+            1
+          </div>
+          <div className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Upload Invoice
+          </div>
+        </CardTitle>
+        <p className='text-muted-foreground'>
+          Upload your invoice PDF and provide customer details to get an instant quote
+        </p>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className='space-y-6'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className="space-y-2">
+              <Label htmlFor='amount' className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Invoice Amount (USD) *
+              </Label>
+              <Input
+                type='number'
+                id='amount'
+                value={invoiceData.amount}
+                onChange={(e) => handleInputChange('amount', e.target.value)}
+                placeholder='10000'
+                step='0.01'
+                min='0'
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor='dueDate' className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Due Date *
+              </Label>
+              <Input
+                type='date'
+                id='dueDate'
+                value={invoiceData.dueDate}
+                onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className="space-y-2">
+              <Label htmlFor='customerName' className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Customer Name *
+              </Label>
+              <Input
+                type='text'
+                id='customerName'
+                value={invoiceData.customerName}
+                onChange={(e) => handleInputChange('customerName', e.target.value)}
+                placeholder='Acme Corp'
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor='customerEmail' className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Customer Email *
+              </Label>
+              <Input
+                type='email'
+                id='customerEmail'
+                value={invoiceData.customerEmail}
+                onChange={(e) => handleInputChange('customerEmail', e.target.value)}
+                placeholder='billing@acme.com'
+                required
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor='description' className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Description
+            </Label>
+            <Textarea
+              id='description'
+              value={invoiceData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              placeholder='Services rendered, products delivered, etc.'
+              rows={3}
             />
           </div>
           
-          <div>
-            <label htmlFor='dueDate' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-              Due Date *
-            </label>
-            <input
-              type='date'
-              id='dueDate'
-              value={invoiceData.dueDate}
-              onChange={(e) => handleInputChange('dueDate', e.target.value)}
-              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100'
-              required
+          <div className="space-y-2">
+            <Label htmlFor='file' className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Invoice PDF (Optional)
+            </Label>
+            <Input
+              type='file'
+              id='file'
+              accept='.pdf'
+              onChange={handleFileChange}
             />
-          </div>
-        </div>
-        
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-          <div>
-            <label htmlFor='customerName' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-              Customer Name *
-            </label>
-            <input
-              type='text'
-              id='customerName'
-              value={invoiceData.customerName}
-              onChange={(e) => handleInputChange('customerName', e.target.value)}
-              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100'
-              placeholder='Acme Corp'
-              required
-            />
+            <p className='text-xs text-muted-foreground'>
+              Upload your invoice PDF for faster processing
+            </p>
           </div>
           
-          <div>
-            <label htmlFor='customerEmail' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-              Customer Email *
-            </label>
-            <input
-              type='email'
-              id='customerEmail'
-              value={invoiceData.customerEmail}
-              onChange={(e) => handleInputChange('customerEmail', e.target.value)}
-              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100'
-              placeholder='billing@acme.com'
-              required
-            />
-          </div>
-        </div>
-        
-        <div>
-          <label htmlFor='description' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-            Description
-          </label>
-          <textarea
-            id='description'
-            value={invoiceData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
-            className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100'
-            placeholder='Services rendered, products delivered, etc.'
-            rows={3}
-          />
-        </div>
-        
-        <div>
-          <label htmlFor='file' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
-            Invoice PDF (Optional)
-          </label>
-          <input
-            type='file'
-            id='file'
-            accept='.pdf'
-            onChange={handleFileChange}
-            className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100'
-          />
-          <p className='text-xs text-gray-500 mt-1'>
-            Upload your invoice PDF for faster processing
-          </p>
-        </div>
-        
-        <button
-          type='submit'
-          disabled={isUploading}
-          className='w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors'
-        >
-          {isUploading ? 'Uploading...' : 'Upload Invoice'}
-        </button>
-      </form>
-    </div>
+          <Button
+            type='submit'
+            disabled={isUploading}
+            className='w-full'
+            size="lg"
+          >
+            {isUploading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Invoice
+              </>
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
