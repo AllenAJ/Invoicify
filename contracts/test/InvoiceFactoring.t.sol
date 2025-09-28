@@ -119,9 +119,9 @@ contract InvoiceFactoringTest is Test {
         InvoiceFactoring.Invoice memory invoice = invoiceFactoring.getInvoice(invoiceId);
         assertTrue(invoice.isPaid);
         
-        // Check investor earned profit
+        // Check investor earned profit (1 PYUSD payment)
         InvoiceFactoring.Investor memory investorData = invoiceFactoring.getInvestor(investor);
-        assertEq(investorData.totalEarned, 20 * 10**6); // 20% profit
+        assertEq(investorData.totalEarned, 1 * 10**6); // 1 PYUSD profit
     }
     
     function testWithdrawLiquidity() public {
@@ -166,7 +166,7 @@ contract InvoiceFactoringTest is Test {
         invoiceFactoring.collectReturns();
         uint256 balanceAfter = mockPYUSD.balanceOf(investor);
         
-        assertEq(balanceAfter - balanceBefore, 20 * 10**6); // 20% profit
+        assertEq(balanceAfter - balanceBefore, 1 * 10**6); // 1 PYUSD profit
         
         InvoiceFactoring.Investor memory investorData = invoiceFactoring.getInvestor(investor);
         assertEq(investorData.totalEarned, 0);

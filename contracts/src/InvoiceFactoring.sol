@@ -60,6 +60,8 @@ contract InvoiceFactoring is ReentrancyGuard, Ownable {
     /**
      * @dev Create an invoice from uploaded PDF data
      * This function is called after PDF parsing extracts invoice data
+     * Note: In the new liquidity pool approach, invoices are primarily stored in the database
+     * This function is kept for backward compatibility and optional blockchain tracking
      */
     function createInvoiceFromData(
         address _customer,
@@ -89,6 +91,53 @@ contract InvoiceFactoring is ReentrancyGuard, Ownable {
         businessInvoices[msg.sender].push(invoiceId);
         
         emit InvoiceCreated(invoiceId, msg.sender, _amount);
+        return invoiceId;
+    }
+    
+    /**
+     * @dev Create a factored invoice directly (for liquidity pool approach)
+     * This allows businesses to create invoices that are immediately ready for payment
+     */
+    function createFactoredInvoice(
+        address _customer,
+        uint256 _amount,
+        uint256 _dueDate,
+        string memory _description
+    ) external returns (uint256) {
+        require(_customer != address(0), "Invalid customer address");
+        require(_amount > 0, "Amount must be greater than 0");
+        require(_dueDate > block.timestamp, "Due date must be in the future");
+        
+        // Fixed factor amount of 8 PYUSD (for testing with limited liquidity)
+        uint256 factorAmount = 8 * 10**6; // 8 PYUSD with 6 decimals
+        require(totalLiquidity >= factorAmount, "Insufficient liquidity");
+        
+        uint256 invoiceId = nextInvoiceId++;
+        
+        invoices[invoiceId] = Invoice({
+            id: invoiceId,
+            business: msg.sender,
+            customer: _customer,
+            amount: _amount,
+            dueDate: _dueDate,
+            description: _description,
+            isFactored: true,
+            isPaid: false,
+            factorAmount: factorAmount,
+            factor: address(this) // Contract acts as the factor in liquidity pool approach
+        });
+        
+        businessInvoices[msg.sender].push(invoiceId);
+        
+        // Update global state
+        totalLiquidity -= factorAmount;
+        totalFactored += factorAmount;
+        
+        // Transfer PYUSD to business immediately
+        require(PYUSD.transfer(msg.sender, factorAmount), "Transfer failed");
+        
+        emit InvoiceCreated(invoiceId, msg.sender, _amount);
+        emit InvoiceFactored(invoiceId, address(this), factorAmount);
         return invoiceId;
     }
 
@@ -132,7 +181,8 @@ contract InvoiceFactoring is ReentrancyGuard, Ownable {
     
     
     /**
-     * @dev Pay an invoice (customer pays the full amount)
+     * @dev Pay an invoice directly to the liquidity pool (simplified approach)
+     * Customer pays 1 PYUSD to the pool, and the invoice is marked as paid
      */
     function payInvoice(uint256 _invoiceId) external nonReentrant {
         Invoice storage invoice = invoices[_invoiceId];
@@ -141,15 +191,18 @@ contract InvoiceFactoring is ReentrancyGuard, Ownable {
         require(invoice.isFactored, "Invoice must be factored first");
         require(msg.sender == invoice.customer, "Only customer can pay");
         
-        // Transfer full amount from customer
-        require(PYUSD.transferFrom(msg.sender, address(this), invoice.amount), "Payment failed");
+        // Fixed payment amount of 1 PYUSD (for testing)
+        uint256 paymentAmount = 1 * 10**6; // 1 PYUSD with 6 decimals
+        
+        // Transfer payment from customer to liquidity pool
+        require(PYUSD.transferFrom(msg.sender, address(this), paymentAmount), "Payment failed");
         
         // Mark as paid
         invoice.isPaid = true;
         
-        // Calculate returns
-        uint256 factorReturn = invoice.amount; // Factor gets full amount back
-        uint256 factorProfit = invoice.amount - invoice.factorAmount; // Profit is the difference
+        // Calculate returns for the factor
+        uint256 factorReturn = invoice.factorAmount; // Factor gets their original amount back
+        uint256 factorProfit = paymentAmount; // Factor gets the payment as profit
         
         // Update investor earnings
         investors[invoice.factor].totalEarned += factorProfit;
@@ -157,7 +210,40 @@ contract InvoiceFactoring is ReentrancyGuard, Ownable {
         // Add liquidity back to pool
         totalLiquidity += factorReturn;
         
-        emit InvoicePaid(_invoiceId, invoice.amount);
+        emit InvoicePaid(_invoiceId, paymentAmount);
+    }
+    
+    /**
+     * @dev Pay invoice by invoice ID (alternative function for direct payment)
+     * This allows customers to pay without needing the full invoice object
+     */
+    function payInvoiceById(uint256 _invoiceId) external nonReentrant {
+        Invoice storage invoice = invoices[_invoiceId];
+        require(invoice.id != 0, "Invoice does not exist");
+        require(!invoice.isPaid, "Invoice already paid");
+        require(invoice.isFactored, "Invoice must be factored first");
+        require(msg.sender == invoice.customer, "Only customer can pay");
+        
+        // Fixed payment amount of 1 PYUSD (for testing)
+        uint256 paymentAmount = 1 * 10**6; // 1 PYUSD with 6 decimals
+        
+        // Transfer payment from customer to liquidity pool
+        require(PYUSD.transferFrom(msg.sender, address(this), paymentAmount), "Payment failed");
+        
+        // Mark as paid
+        invoice.isPaid = true;
+        
+        // Calculate returns for the factor
+        uint256 factorReturn = invoice.factorAmount; // Factor gets their original amount back
+        uint256 factorProfit = paymentAmount; // Factor gets the payment as profit
+        
+        // Update investor earnings
+        investors[invoice.factor].totalEarned += factorProfit;
+        
+        // Add liquidity back to pool
+        totalLiquidity += factorReturn;
+        
+        emit InvoicePaid(_invoiceId, paymentAmount);
     }
     
     // Investor functions

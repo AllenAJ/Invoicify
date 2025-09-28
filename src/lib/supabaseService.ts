@@ -62,7 +62,30 @@ export class SupabaseService {
     return data || []
   }
 
+  static async getInvoicesByCustomerENS(ensName: string): Promise<Invoice[]> {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('customer_ens_name', ensName)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  }
+
+  static async getInvoicesByCustomerAddress(address: string): Promise<Invoice[]> {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('customer_address', address.toLowerCase())
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+  }
+
   static async updateInvoice(id: string, updates: Partial<Invoice>) {
+    console.log('SupabaseService: Updating invoice', { id, updates })
     const { data, error } = await supabase
       .from('invoices')
       .update(updates)
@@ -70,7 +93,11 @@ export class SupabaseService {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('SupabaseService: Update error', error)
+      throw error
+    }
+    console.log('SupabaseService: Update successful', data)
     return data
   }
 

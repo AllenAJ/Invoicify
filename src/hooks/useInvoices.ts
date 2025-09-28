@@ -38,13 +38,16 @@ export function useInvoices(userId?: string) {
   const updateInvoice = async (id: string, updates: Partial<Invoice>) => {
     try {
       setError(null)
+      console.log('useInvoices: Updating invoice', { id, updates })
       const updatedInvoice = await SupabaseService.updateInvoice(id, updates)
+      console.log('useInvoices: Updated invoice result', updatedInvoice)
       setInvoices(prev => prev.map(invoice => 
         invoice.id === id ? updatedInvoice : invoice
       ))
       return updatedInvoice
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update invoice'
+      console.error('useInvoices: Update failed', err)
       setError(errorMessage)
       throw new Error(errorMessage)
     }

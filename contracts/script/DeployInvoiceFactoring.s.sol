@@ -9,8 +9,8 @@ contract DeployInvoiceFactoring is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
         
-        // PYUSD on ETH Sepolia: 0x6c3ea9036406852006290770BEdFcAbA0e23A0e8
-        InvoiceFactoring invoiceFactoring = new InvoiceFactoring(0x6c3ea9036406852006290770BEdFcAbA0e23A0e8);
+        // PYUSD on ETH Sepolia: 0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9
+        InvoiceFactoring invoiceFactoring = new InvoiceFactoring(0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9);
         
         console.log("InvoiceFactoring deployed at:", address(invoiceFactoring));
         console.log("PYUSD token address:", address(invoiceFactoring.PYUSD()));

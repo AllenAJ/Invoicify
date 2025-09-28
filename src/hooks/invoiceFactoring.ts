@@ -1,115 +1,8 @@
 import { useWriteContract, useReadContract, useAccount } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { usePaymentTokenAddress } from './paymentToken';
-import { CONTRACT_CONFIG, isContractDeployed, getContractAddress } from '@/config/contract';
-
-// Contract ABI - you'll need to update this with the actual deployed contract address
-const INVOICE_FACTORING_ABI = [
-  {
-    "inputs": [
-      {"internalType": "address", "name": "_customer", "type": "address"},
-      {"internalType": "uint256", "name": "_amount", "type": "uint256"},
-      {"internalType": "uint256", "name": "_dueDate", "type": "uint256"},
-      {"internalType": "string", "name": "_description", "type": "string"}
-    ],
-    "name": "createInvoiceFromData",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_invoiceId", "type": "uint256"}],
-    "name": "factorInvoice",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_invoiceId", "type": "uint256"}],
-    "name": "payInvoice",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_amount", "type": "uint256"}],
-    "name": "depositLiquidity",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_amount", "type": "uint256"}],
-    "name": "withdrawLiquidity",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "collectReturns",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_invoiceId", "type": "uint256"}],
-    "name": "getInvoice",
-    "outputs": [
-      {
-        "components": [
-          {"internalType": "uint256", "name": "id", "type": "uint256"},
-          {"internalType": "address", "name": "business", "type": "address"},
-          {"internalType": "address", "name": "customer", "type": "address"},
-          {"internalType": "uint256", "name": "amount", "type": "uint256"},
-          {"internalType": "uint256", "name": "dueDate", "type": "uint256"},
-          {"internalType": "string", "name": "description", "type": "string"},
-          {"internalType": "bool", "name": "isFactored", "type": "bool"},
-          {"internalType": "bool", "name": "isPaid", "type": "bool"},
-          {"internalType": "uint256", "name": "factorAmount", "type": "uint256"},
-          {"internalType": "address", "name": "factor", "type": "address"}
-        ],
-        "internalType": "struct InvoiceFactoring.Invoice",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "_investor", "type": "address"}],
-    "name": "getInvestor",
-    "outputs": [
-      {
-        "components": [
-          {"internalType": "uint256", "name": "totalDeposited", "type": "uint256"},
-          {"internalType": "uint256", "name": "totalEarned", "type": "uint256"},
-          {"internalType": "bool", "name": "isActive", "type": "bool"}
-        ],
-        "internalType": "struct InvoiceFactoring.Investor",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getAvailableLiquidity",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "_invoiceAmount", "type": "uint256"}],
-    "name": "calculateFactorAmount",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "pure",
-    "type": "function"
-  }
-] as const;
+import { isContractDeployed, getContractAddress } from '@/config/contract';
+import { InvoiceFactoringABI } from '@/abi/InvoiceFactoring';
 
 // Use contract address from config
 const INVOICE_FACTORING_ADDRESS = getContractAddress();
@@ -136,10 +29,48 @@ export function useInvoiceFactoring() {
     
     return writeContract({
       address: INVOICE_FACTORING_ADDRESS,
-      abi: INVOICE_FACTORING_ABI,
+      abi: InvoiceFactoringABI,
       functionName: 'createInvoiceFromData',
       args: [invoiceData.customer as `0x${string}`, amount, BigInt(dueDate), invoiceData.description],
     });
+  };
+
+  // Create a factored invoice directly (for liquidity pool approach)
+  const createFactoredInvoice = async (invoiceData: InvoiceData) => {
+    if (!address) throw new Error("No wallet connected");
+    if (!isContractDeployed()) throw new Error("Contract not deployed yet. Please deploy the contract first.");
+    
+    const amount = parseUnits(invoiceData.amount, 6); // PYUSD has 6 decimals
+    const dueDate = Math.floor(new Date(invoiceData.dueDate).getTime() / 1000);
+    
+    console.log('🔍 Creating factored invoice with params:', {
+      customer: invoiceData.customer,
+      amount: invoiceData.amount,
+      amountWei: amount.toString(),
+      dueDate: invoiceData.dueDate,
+      dueDateUnix: dueDate,
+      description: invoiceData.description,
+      contractAddress: INVOICE_FACTORING_ADDRESS
+    });
+    
+    try {
+      const hash = await writeContract({
+        address: INVOICE_FACTORING_ADDRESS,
+        abi: InvoiceFactoringABI,
+        functionName: 'createFactoredInvoice',
+        args: [invoiceData.customer as `0x${string}`, amount, BigInt(dueDate), invoiceData.description],
+      });
+      
+      console.log('✅ Contract transaction submitted:', hash);
+      
+      // For now, return the transaction hash
+      // In a production app, you'd wait for the transaction to be mined and parse the event logs
+      // to get the actual invoice ID. For simplicity, we'll use a placeholder.
+      return hash;
+    } catch (error) {
+      console.error('❌ Contract transaction failed:', error);
+      throw error;
+    }
   };
 
   // Factor an invoice
@@ -148,28 +79,94 @@ export function useInvoiceFactoring() {
     
     return writeContract({
       address: INVOICE_FACTORING_ADDRESS,
-      abi: INVOICE_FACTORING_ABI,
+      abi: InvoiceFactoringABI,
       functionName: 'factorInvoice',
       args: [BigInt(invoiceId)],
     });
   };
 
-  // Pay an invoice
+  // Pay an invoice (1 PYUSD to liquidity pool)
   const payInvoice = async (invoiceId: number) => {
+    if (!address) throw new Error("No wallet connected");
+    if (!isContractDeployed()) throw new Error("Contract not deployed yet. Please deploy the contract first.");
+    
     return writeContract({
       address: INVOICE_FACTORING_ADDRESS,
-      abi: INVOICE_FACTORING_ABI,
+      abi: InvoiceFactoringABI,
       functionName: 'payInvoice',
       args: [BigInt(invoiceId)],
+    });
+  };
+
+  // Pay PYUSD directly to liquidity pool (for customer payments)
+  const payToLiquidityPool = async (paymentAmount: string = "10") => {
+    if (!address) throw new Error("No wallet connected");
+    if (!isContractDeployed()) throw new Error("Contract not deployed yet. Please deploy the contract first.");
+    
+    const amount = paymentAmount; // Configurable PYUSD payment amount
+    const amountWei = parseUnits(amount, 6);
+    
+    // First, approve the contract to spend PYUSD
+    await writeContract({
+      address: paymentTokenAddress,
+      abi: [
+        {
+          "inputs": [
+            {"internalType": "address", "name": "spender", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"}
+          ],
+          "name": "approve",
+          "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        }
+      ],
+      functionName: 'approve',
+      args: [INVOICE_FACTORING_ADDRESS, amountWei],
+    });
+    
+    // Wait a moment for approval to be processed
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Then deposit 1 PYUSD to liquidity pool
+    return writeContract({
+      address: INVOICE_FACTORING_ADDRESS,
+      abi: InvoiceFactoringABI,
+      functionName: 'depositLiquidity',
+      args: [amountWei],
     });
   };
 
   // Deposit liquidity
   const depositLiquidity = async (amount: string) => {
     const amountWei = parseUnits(amount, 6);
+    
+    // First, approve the contract to spend PYUSD
+    await writeContract({
+      address: paymentTokenAddress,
+      abi: [
+        {
+          "inputs": [
+            {"internalType": "address", "name": "spender", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"}
+          ],
+          "name": "approve",
+          "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        }
+      ],
+      functionName: 'approve',
+      args: [INVOICE_FACTORING_ADDRESS, amountWei],
+    });
+    
+    // Wait a moment for approval to be processed
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Then deposit liquidity
     return writeContract({
       address: INVOICE_FACTORING_ADDRESS,
-      abi: INVOICE_FACTORING_ABI,
+      abi: InvoiceFactoringABI,
       functionName: 'depositLiquidity',
       args: [amountWei],
     });
@@ -180,7 +177,7 @@ export function useInvoiceFactoring() {
     const amountWei = parseUnits(amount, 6);
     return writeContract({
       address: INVOICE_FACTORING_ADDRESS,
-      abi: INVOICE_FACTORING_ABI,
+      abi: InvoiceFactoringABI,
       functionName: 'withdrawLiquidity',
       args: [amountWei],
     });
@@ -190,7 +187,7 @@ export function useInvoiceFactoring() {
   const collectReturns = async () => {
     return writeContract({
       address: INVOICE_FACTORING_ADDRESS,
-      abi: INVOICE_FACTORING_ABI,
+      abi: InvoiceFactoringABI,
       functionName: 'collectReturns',
       args: [],
     });
@@ -198,8 +195,10 @@ export function useInvoiceFactoring() {
 
   return {
     createInvoiceFromData,
+    createFactoredInvoice,
     factorInvoice,
     payInvoice,
+    payToLiquidityPool,
     depositLiquidity,
     withdrawLiquidity,
     collectReturns,
@@ -213,14 +212,14 @@ export function useInvoiceFactoringData() {
   // Get available liquidity
   const { data: availableLiquidity } = useReadContract({
     address: INVOICE_FACTORING_ADDRESS,
-    abi: INVOICE_FACTORING_ABI,
+    abi: InvoiceFactoringABI,
     functionName: 'getAvailableLiquidity',
   });
 
   // Get investor data
   const { data: investorData } = useReadContract({
     address: INVOICE_FACTORING_ADDRESS,
-    abi: INVOICE_FACTORING_ABI,
+    abi: InvoiceFactoringABI,
     functionName: 'getInvestor',
     args: address ? [address] : undefined,
   });

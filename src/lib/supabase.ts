@@ -30,6 +30,8 @@ export interface Invoice {
   due_date: string
   customer_name: string
   customer_email: string
+  customer_address?: string
+  customer_ens_name?: string
   description: string
   pdf_url?: string
   pdf_filename?: string

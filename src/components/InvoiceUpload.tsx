@@ -1,20 +1,22 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, DollarSign, Calendar, User, Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, DollarSign, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { extractInvoiceData, ExtractedInvoiceData } from "@/lib/invoiceParser";
-import { useInvoiceFactoring } from "@/hooks/invoiceFactoring";
 import { isContractDeployed } from "@/config/contract";
 import { useAccount } from "wagmi";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useInvoices } from "@/hooks/useInvoices";
 import { downloadSampleInvoice } from "@/lib/sampleInvoiceGenerator";
+import ENSAddressInput from "./ENSAddressInput";
+import { useInvoiceFactorPricing } from "@/hooks/usePythPrices";
+import { RefreshCw } from "lucide-react";
+import { useInvoiceFactoring } from "@/hooks/invoiceFactoring";
 
 interface InvoiceUploadProps {
   onQuoteGenerated?: (quoteData: {
@@ -24,6 +26,7 @@ interface InvoiceUploadProps {
     dueDate: string;
   }, invoiceAmount: string) => void;
   onAcceptQuote?: () => void;
+  onResetQuote?: () => void;
   isProcessing?: boolean;
 }
 
@@ -32,21 +35,24 @@ interface InvoiceData {
   dueDate: string;
   customerName: string;
   customerEmail: string;
+  customerAddress: string;
   description: string;
   file?: File;
 }
 
-export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: InvoiceUploadProps) {
+export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote, onResetQuote }: InvoiceUploadProps) {
   const { address } = useAccount();
-  const { createInvoiceFromData } = useInvoiceFactoring();
   const { user } = useSupabaseAuth();
   const { createInvoice, uploadPDF, createInvoiceFactoring } = useInvoices(user?.id);
+  const { getFactorQuote, pyusdPrice, loading: priceLoading, lastUpdate, refresh, error } = useInvoiceFactorPricing();
+  const { createFactoredInvoice } = useInvoiceFactoring();
   
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     amount: "",
     dueDate: "",
     customerName: "",
     customerEmail: "",
+    customerAddress: "",
     description: "",
   });
   const [isUploading, setIsUploading] = useState(false);
@@ -60,6 +66,7 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
     netAmount: string;
     dueDate: string;
   } | null>(null);
+  const [resolvedCustomerAddress, setResolvedCustomerAddress] = useState<string | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -102,10 +109,12 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
               due_date: extracted.dueDate || new Date().toISOString().split('T')[0],
               customer_name: extracted.customerName || 'Unknown Customer',
               customer_email: extracted.customerEmail || 'unknown@example.com',
+              customer_address: resolvedCustomerAddress || '',
+              customer_ens_name: invoiceData.customerAddress.includes('.eth') ? invoiceData.customerAddress : undefined,
               description: extracted.description || 'PDF Invoice Upload',
               pdf_url: pdfUrl,
               pdf_filename: file.name,
-              status: 'draft'
+              status: 'created'
             });
             
             console.log('Invoice record created in database:', invoiceRecord);
@@ -205,10 +214,12 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
             due_date: extracted.dueDate || new Date().toISOString().split('T')[0],
             customer_name: extracted.customerName || 'Unknown Customer',
             customer_email: extracted.customerEmail || 'unknown@example.com',
+            customer_address: resolvedCustomerAddress || '',
+            customer_ens_name: invoiceData.customerAddress.includes('.eth') ? invoiceData.customerAddress : undefined,
             description: extracted.description || 'PDF Invoice Upload',
             pdf_url: pdfUrl,
             pdf_filename: invoiceData.file.name,
-            status: 'draft'
+            status: 'created'
           });
           
           console.log('Invoice record created in database:', invoiceRecord);
@@ -271,30 +282,40 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
       return;
     }
 
-    if (!invoiceData.amount || !invoiceData.dueDate || !invoiceData.customerName || !invoiceData.description) {
-      toast.error("Please fill in all required fields");
+    if (!invoiceData.amount || !invoiceData.dueDate || !invoiceData.customerName || !invoiceData.customerAddress || !invoiceData.description) {
+      toast.error("Please fill in all required fields including customer address");
+      return;
+    }
+
+    if (!resolvedCustomerAddress) {
+      toast.error("Please resolve the customer address or ENS name first");
       return;
     }
 
     setIsGettingQuote(true);
     
     try {
-      // Calculate quote (80% advance, 2% fee)
-      const amount = parseFloat(invoiceData.amount);
-      const factorAmount = amount * 0.80; // 80% advance
-      const fee = amount * 0.02; // 2% fee
-      const netAmount = factorAmount - fee; // Net amount to business
+      const invoiceAmountUSD = parseFloat(invoiceData.amount);
+      
+      // Get real-time pricing from Pyth
+      const priceQuote = getFactorQuote(invoiceAmountUSD, 0.8); // 80% factor rate
       
       const quote = {
-        factorAmount: factorAmount.toFixed(2),
-        fee: fee.toFixed(2),
-        netAmount: netAmount.toFixed(2),
+        factorAmount: priceQuote.factorAmount.toFixed(2),
+        fee: priceQuote.fee.toFixed(2),
+        netAmount: priceQuote.netAmount.toFixed(2),
         dueDate: invoiceData.dueDate,
       };
       
       setQuoteData(quote);
       onQuoteGenerated?.(quote, invoiceData.amount);
-      toast.success("Quote generated! Review the terms in the quote section below.");
+      
+      // Show success message with price feed info
+      if (priceQuote.isLive) {
+        toast.success(`Quote generated with live Pyth prices! PYUSD rate: $${priceQuote.pyusdRate.toFixed(4)}`);
+      } else {
+        toast.success("Quote generated! (Using fallback pricing - Pyth unavailable)");
+      }
       
     } catch (error: any) {
       console.error("Error getting quote:", error);
@@ -304,81 +325,104 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
     }
   };
 
+  const [isProcessingQuote, setIsProcessingQuote] = useState(false);
+
   const handleAcceptQuote = async () => {
     if (!address || !quoteData || !user) {
       toast.error("Please connect your wallet and get a quote first");
       return;
     }
     
+    setIsProcessingQuote(true);
+    console.log('🚀 Starting handleAcceptQuote...');
+    
     try {
-      // Upload PDF to Supabase if file exists
-      let pdfUrl = "";
-      if (invoiceData.file) {
-        pdfUrl = await uploadPDF(invoiceData.file, user.id);
-      }
-
-      // Save invoice to Supabase
-      const savedInvoice = await createInvoice({
-        user_id: user.id,
-        invoice_number: parsedData?.invoiceNumber || `INV-${Date.now()}`,
-        amount: parseFloat(invoiceData.amount),
-        due_date: invoiceData.dueDate,
-        customer_name: invoiceData.customerName,
-        customer_email: invoiceData.customerEmail,
-        description: invoiceData.description,
-        pdf_url: pdfUrl,
-        pdf_filename: invoiceData.file?.name,
-        status: 'created'
-      });
-
-      // Create invoice factoring record
-      await createInvoiceFactoring({
-        invoice_id: savedInvoice.id,
-        user_id: user.id,
-        factor_amount: parseFloat(quoteData.factorAmount),
-        factor_fee: parseFloat(quoteData.fee),
-        net_amount: parseFloat(quoteData.netAmount),
-        status: 'pending'
-      });
-
-      // For now, we'll use a placeholder customer address
-      // In a real app, you'd need to resolve the customer email to an address
-      const customerAddress = "0x0000000000000000000000000000000000000000"; // Placeholder
-      
-      // Create invoice on blockchain and factor it
-      const blockchainInvoiceId = await createInvoiceFromData({
-        customer: customerAddress,
+      // FIRST: Create factored invoice on blockchain
+      console.log('🔗 Step 1: Creating factored invoice on blockchain...');
+      const transactionHash = await createFactoredInvoice({
+        customer: resolvedCustomerAddress || '',
         amount: invoiceData.amount,
         dueDate: invoiceData.dueDate,
         description: invoiceData.description,
       });
 
-      // Update invoice with blockchain ID
-      await createInvoice({
-        ...savedInvoice,
-        blockchain_invoice_id: blockchainInvoiceId,
-        status: 'factored'
-      });
+      console.log('✅ Blockchain transaction successful:', transactionHash);
+      toast.success(`🎉 PYUSD received! Transaction: ${transactionHash.slice(0, 10)}...`);
 
-      toast.success("Invoice created and factored successfully! You'll receive PYUSD shortly.");
+      // SECOND: Save to database (optional, don't fail if this doesn't work)
+      console.log('💾 Step 2: Saving to database...');
+      let savedInvoice = null;
       
-      // Reset form
+      try {
+        // Upload PDF to Supabase if file exists
+        let pdfUrl = "";
+        if (invoiceData.file) {
+          pdfUrl = await uploadPDF(invoiceData.file, user.id);
+        }
+
+        // Save invoice to Supabase
+        savedInvoice = await createInvoice({
+          user_id: user.id,
+          invoice_number: parsedData?.invoiceNumber || `INV-${Date.now()}`,
+          amount: parseFloat(invoiceData.amount),
+          due_date: invoiceData.dueDate,
+          customer_name: invoiceData.customerName,
+          customer_email: invoiceData.customerEmail,
+          customer_address: resolvedCustomerAddress || '',
+          customer_ens_name: invoiceData.customerAddress.includes('.eth') ? invoiceData.customerAddress : undefined,
+          description: invoiceData.description,
+          pdf_url: pdfUrl,
+          pdf_filename: invoiceData.file?.name,
+          status: 'factored'
+        });
+
+        // Create invoice factoring record
+        await createInvoiceFactoring({
+          invoice_id: savedInvoice.id,
+          user_id: user.id,
+          factor_amount: parseFloat(quoteData.factorAmount),
+          factor_fee: parseFloat(quoteData.fee),
+          net_amount: parseFloat(quoteData.netAmount),
+          status: 'completed'
+        });
+
+        console.log('✅ Database save successful');
+        
+      } catch (dbError) {
+        console.error('⚠️ Database save failed (but blockchain transaction succeeded):', dbError);
+        toast.error("⚠️ PYUSD was transferred but failed to save to database.");
+      }
+
+      // Wait a moment and show final confirmation
+      setTimeout(() => {
+        console.log('🔍 Transaction completed successfully!');
+        toast.success('💰 Check your wallet - PYUSD has been transferred!');
+      }, 3000);
+
+      // Only reset form on successful transaction
       setInvoiceData({
         amount: "",
         dueDate: "",
         customerName: "",
         customerEmail: "",
+        customerAddress: "",
         description: "",
       });
       setParsedData(null);
       setQuoteData(null);
-      
+      setResolvedCustomerAddress(null);
+
       // Call the parent's accept quote handler
       onAcceptQuote?.();
+
+      // Reset the parent's quote data
+      onResetQuote?.();
     } catch (error: any) {
-      console.error("Error accepting quote:", error);
-      const errorMessage = error?.message || "Failed to accept quote. Please try again.";
-      toast.error(errorMessage);
+      console.error("Error in quote acceptance:", error);
+      const errorMessage = error?.message || "Failed to process quote. Please try again.";
+      toast.error(`❌ Transaction failed: ${errorMessage}`);
+    } finally {
+      setIsProcessingQuote(false);
     }
   };
 
@@ -392,8 +436,8 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
     }
     
     // If no file, just validate the form
-    if (!invoiceData.amount || !invoiceData.dueDate || !invoiceData.customerName || !invoiceData.customerEmail) {
-      toast.error("Please fill in all required fields or upload a PDF file");
+    if (!invoiceData.amount || !invoiceData.dueDate || !invoiceData.customerName || !invoiceData.customerEmail || !invoiceData.customerAddress) {
+      toast.error("Please fill in all required fields including customer address or upload a PDF file");
       return;
     }
 
@@ -609,6 +653,16 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
           </div>
         </div>
         
+        {/* Customer Address/ENS Input */}
+        <ENSAddressInput
+          label="Customer Wallet Address or ENS Name"
+          placeholder="0x... or alice.eth"
+          value={invoiceData.customerAddress}
+          onChange={(value) => handleInputChange('customerAddress', value)}
+          onAddressResolved={setResolvedCustomerAddress}
+          required={true}
+        />
+        
           <div className="space-y-3">
             <Label htmlFor='description' className='text-base font-medium text-foreground'>
             Description
@@ -644,6 +698,63 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
             )}
           </Button>
           
+          {/* Enhanced Pyth Price Feed Status */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${priceLoading ? 'bg-yellow-500 animate-pulse' : pyusdPrice ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <div>
+                  <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                    Pyth Price Feed
+                  </span>
+                  <div className="text-xs text-blue-700 dark:text-blue-300">
+                    Real-time market data
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  {priceLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-pulse bg-blue-200 dark:bg-blue-700 h-4 w-16 rounded"></div>
+                      <span className="text-xs text-blue-600 dark:text-blue-400">Loading...</span>
+                    </div>
+                  ) : pyusdPrice ? (
+                    <div className="text-sm">
+                      <span className="font-bold text-green-700 dark:text-green-300">
+                        PYUSD: ${pyusdPrice.toFixed(6)}
+                      </span>
+                      {lastUpdate && (
+                        <div className="text-xs text-blue-600 dark:text-blue-400">
+                          {lastUpdate.toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm">
+                      <span className="text-red-600 dark:text-red-400 font-medium">Offline</span>
+                      <div className="text-xs text-red-500 dark:text-red-400">Using fallback</div>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={refresh}
+                  disabled={priceLoading}
+                  className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/30"
+                >
+                  <RefreshCw className={`h-4 w-4 ${priceLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </div>
+            {error && (
+              <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+                ⚠️ {error} - Using fallback pricing
+              </div>
+            )}
+          </div>
+
           <Button
             type='button'
             onClick={handleGetQuote}
@@ -654,12 +765,12 @@ export default function InvoiceUpload({ onQuoteGenerated, onAcceptQuote }: Invoi
             {isGettingQuote ? (
               <>
                 <Loader2 className="h-5 w-5 mr-3 animate-spin" />
-                Getting Quote...
+                Getting Quote with Live Prices...
               </>
             ) : (
               <>
                 <DollarSign className="h-5 w-5 mr-3" />
-                Get Factoring Quote
+                Get Factoring Quote {pyusdPrice ? '(Live Prices)' : '(Fallback)'}
               </>
             )}
           </Button>

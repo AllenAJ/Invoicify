@@ -7,7 +7,7 @@ export function paymentTokenAddress(chain: Chain | undefined): Address {
     case undefined:
     case sepolia:
       // PYUSD ETH Sepolia
-      return "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8";
+      return "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
     default:
       throw new Error(
         `Payment token address not configured for chain ${chain}`
@@ -18,7 +18,7 @@ export function paymentTokenAddress(chain: Chain | undefined): Address {
 // Moving our wagmi config here cleans up our App.tsx
 // You can update App.tsx to import this.
 export const wagmiConfig = getDefaultConfig({
-  appName: "Invoice Factor",
+  appName: "Invoicify",
   projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   chains: [sepolia],
   transports: {

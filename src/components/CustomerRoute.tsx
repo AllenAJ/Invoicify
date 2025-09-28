@@ -1,4 +1,4 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import CustomWalletButton from "./CustomWalletButton";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
@@ -8,6 +8,7 @@ import WalletInfo from "./WalletInfo";
 import ReceiveInvoice from "./ReceiveInvoice";
 import PayWithPYUSD from "./PayWithPYUSD";
 import AutomaticSettlement from "./AutomaticSettlement";
+import CustomerInvoiceLookup from "./CustomerInvoiceLookup";
 
 export default function CustomerRoute() {
   const { isConnected } = useAccount();
@@ -15,7 +16,7 @@ export default function CustomerRoute() {
   return (
     <div className='min-h-screen bg-background'>
       <Helmet>
-        <title>Invoice Factor - Pay Invoice</title>
+        <title>Invoicify - Pay Invoice</title>
         <meta name='description' content='Pay your invoices with PYUSD using any compatible wallet' />
         <link rel='canonical' href='https://invoice-factor.example.com/customer' />
       </Helmet>
@@ -25,22 +26,27 @@ export default function CustomerRoute() {
         <div className='max-w-6xl mx-auto px-6 py-4'>
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-8'>
-              <Link to="/" className='text-2xl font-bold text-foreground'>
-                Invoice Factor
+              <Link to="/" className='flex items-center gap-3 text-2xl font-bold text-foreground'>
+                <img 
+                  src="/PYUSD-token.png" 
+                  alt="PYUSD" 
+                  className="w-8 h-8 rounded-full"
+                />
+                Invoicify
               </Link>
               <div className='hidden md:flex items-center gap-6'>
-                <Link to="/business" className='text-muted-foreground hover:text-foreground transition-colors'>
+                <Link to="/factor-your-invoice" className='text-muted-foreground hover:text-foreground transition-colors'>
                   For Business
                 </Link>
                 <Link to="/investor" className='text-muted-foreground hover:text-foreground transition-colors'>
-                  For Investors
+                Provide Liquidity
                 </Link>
                 <Link to="/dashboard" className='text-muted-foreground hover:text-foreground transition-colors'>
                   Dashboard
                 </Link>
               </div>
             </div>
-            <ConnectButton />
+            <CustomWalletButton />
           </div>
         </div>
       </nav>
@@ -102,9 +108,9 @@ export default function CustomerRoute() {
                     <CreditCard className="h-8 w-8 text-primary" />
                   </div>
                   <div className='space-y-3'>
-                    <h3 className='text-xl font-bold text-foreground'>Low Fees</h3>
+                    <h3 className='text-xl font-bold text-foreground'>2.5% Cashback</h3>
                     <p className='text-muted-foreground'>
-                      Minimal transaction fees compared to traditional payment methods
+                      Get 2.5% cashback on every PYUSD payment you make
                     </p>
                   </div>
                 </div>
@@ -112,15 +118,16 @@ export default function CustomerRoute() {
             </div>
 
             {/* User Status */}
-            <div className='space-y-12'>
+            {/* <div className='space-y-12'>
               <WalletInfo />
-            </div>
+            </div> */}
             
             {/* Main Workflow */}
             <div className='space-y-16'>
-              <ReceiveInvoice />
+              <CustomerInvoiceLookup />
+              {/* <ReceiveInvoice />
               <PayWithPYUSD />
-              <AutomaticSettlement />
+              <AutomaticSettlement /> */}
             </div>
           </div>
         ) : (
@@ -134,7 +141,7 @@ export default function CustomerRoute() {
               </p>
             </div>
             <div className='flex justify-center'>
-              <ConnectButton />
+              <CustomWalletButton />
             </div>
           </div>
         )}

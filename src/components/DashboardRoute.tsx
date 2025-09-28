@@ -1,12 +1,10 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import CustomWalletButton from "./CustomWalletButton";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
-  Wallet, 
   FileText, 
   DollarSign, 
   Calendar, 
@@ -23,13 +21,12 @@ import Footer from "./Footer";
 import WalletInfo from "./WalletInfo";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useInvoices } from "@/hooks/useInvoices";
-import { useInvoiceFactoring } from "@/hooks/invoiceFactoring";
 
 export default function DashboardRoute() {
-  const { isConnected, address } = useAccount();
+  const { isConnected } = useAccount();
   const { user } = useSupabaseAuth();
   const { invoices, loading: invoicesLoading, error: invoicesError } = useInvoices(user?.id);
-  const { contractBalance, userBalance } = useInvoiceFactoring();
+  // Note: contractBalance and userBalance are not used in this component
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -76,7 +73,7 @@ export default function DashboardRoute() {
   return (
     <div className='min-h-screen bg-background'>
       <Helmet>
-        <title>Dashboard - Invoice Factor</title>
+        <title>Dashboard - Invoicify</title>
         <meta name='description' content='View your wallet details and invoice history' />
         <link rel='canonical' href='https://invoice-factor.example.com/dashboard' />
       </Helmet>
@@ -86,15 +83,20 @@ export default function DashboardRoute() {
         <div className='max-w-6xl mx-auto px-6 py-4'>
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-8'>
-              <Link to="/" className='text-2xl font-bold text-foreground'>
-                Invoice Factor
+              <Link to="/" className='flex items-center gap-3 text-2xl font-bold text-foreground'>
+                <img 
+                  src="/PYUSD-token.png" 
+                  alt="PYUSD" 
+                  className="w-8 h-8 rounded-full"
+                />
+                Invoicify
               </Link>
               <div className='hidden md:flex items-center gap-6'>
-                <Link to="/business" className='text-muted-foreground hover:text-foreground transition-colors'>
+                <Link to="/factor-your-invoice" className='text-muted-foreground hover:text-foreground transition-colors'>
                   For Business
                 </Link>
                 <Link to="/investor" className='text-muted-foreground hover:text-foreground transition-colors'>
-                  For Investors
+                Provide Liquidity
                 </Link>
                 <Link to="/customer" className='text-muted-foreground hover:text-foreground transition-colors'>
                   Pay Invoice
@@ -104,7 +106,7 @@ export default function DashboardRoute() {
                 </Link>
               </div>
             </div>
-            <ConnectButton />
+            <CustomWalletButton />
           </div>
         </div>
       </nav>
@@ -170,7 +172,7 @@ export default function DashboardRoute() {
                 <h2 className='text-3xl font-bold text-foreground'>
                   Invoice History
                 </h2>
-                <Link to="/business">
+                <Link to="/factor-your-invoice">
                   <Button className='minimal-button bg-primary text-primary-foreground hover:bg-primary/90'>
                     Create New Invoice
                   </Button>
@@ -194,7 +196,7 @@ export default function DashboardRoute() {
                     <h3 className='text-xl font-bold text-foreground'>No Invoices Yet</h3>
                     <p className='text-muted-foreground'>Create your first invoice to get started</p>
                   </div>
-                  <Link to="/business">
+                  <Link to="/factor-your-invoice">
                     <Button className='minimal-button bg-primary text-primary-foreground hover:bg-primary/90'>
                       Create Invoice
                     </Button>
@@ -305,7 +307,7 @@ export default function DashboardRoute() {
               </p>
             </div>
             <div className='flex justify-center'>
-              <ConnectButton />
+              <CustomWalletButton />
             </div>
           </div>
         )}

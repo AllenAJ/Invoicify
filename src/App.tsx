@@ -33,7 +33,7 @@ export default function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<InvoiceFactor />} />
-                <Route path="/business" element={<BusinessRoute />} />
+                <Route path="/factor-your-invoice" element={<BusinessRoute />} />
                 <Route path="/investor" element={<InvestorRoute />} />
                 <Route path="/customer" element={<CustomerRoute />} />
                 <Route path="/dashboard" element={<DashboardRoute />} />

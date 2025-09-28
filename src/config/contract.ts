@@ -3,7 +3,7 @@
 
 export const CONTRACT_CONFIG = {
   // Deployed contract address on ETH Sepolia
-  INVOICE_FACTORING_ADDRESS: "0xF7c050ff27EE570C83F2574beEa73C4eBC12C9d9" as `0x${string}`,
+  INVOICE_FACTORING_ADDRESS: "0x49FA36529E6802579d78ad033C459b78b7e7c814" as `0x${string}`,
   
   // Network configuration
   NETWORK: {
@@ -14,7 +14,7 @@ export const CONTRACT_CONFIG = {
   
   // PYUSD token configuration
   PYUSD: {
-    address: "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8" as `0x${string}`,
+    address: "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9" as `0x${string}`,
     decimals: 6,
     symbol: "PYUSD",
   },

@@ -1,14 +1,10 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import CustomWalletButton from "./CustomWalletButton";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
-import { TrendingUp, DollarSign, Shield, Zap } from "lucide-react";
 import Footer from "./Footer";
-import WalletInfo from "./WalletInfo";
-import DepositPYUSD from "./DepositPYUSD";
-import RiskPreferences from "./RiskPreferences";
-import AutomaticMatching from "./AutomaticMatching";
-import CollectReturns from "./CollectReturns";
+import QuickLiquidityDeposit from "./QuickLiquidityDeposit";
+import EstimatedReturns from "./EstimatedReturns";
 
 export default function InvestorRoute() {
   const { isConnected } = useAccount();
@@ -16,7 +12,7 @@ export default function InvestorRoute() {
   return (
     <div className='min-h-screen bg-background'>
       <Helmet>
-        <title>Invoice Factor - For Investors</title>
+        <title>Invoicify - Provide Liquidity</title>
         <meta name='description' content='Earn yield by providing PYUSD liquidity for invoice factoring' />
         <link rel='canonical' href='https://invoice-factor.example.com/investor' />
       </Helmet>
@@ -26,11 +22,16 @@ export default function InvestorRoute() {
         <div className='max-w-6xl mx-auto px-6 py-4'>
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-8'>
-              <Link to="/" className='text-2xl font-bold text-foreground'>
-                Invoice Factor
+              <Link to="/" className='flex items-center gap-3 text-2xl font-bold text-foreground'>
+                <img 
+                  src="/PYUSD-token.png" 
+                  alt="PYUSD" 
+                  className="w-8 h-8 rounded-full"
+                />
+                Invoicify
               </Link>
               <div className='hidden md:flex items-center gap-6'>
-                <Link to="/business" className='text-muted-foreground hover:text-foreground transition-colors'>
+                <Link to="/factor-your-invoice" className='text-muted-foreground hover:text-foreground transition-colors'>
                   For Business
                 </Link>
                 <Link to="/customer" className='text-muted-foreground hover:text-foreground transition-colors'>
@@ -41,7 +42,7 @@ export default function InvestorRoute() {
                 </Link>
               </div>
             </div>
-            <ConnectButton />
+            <CustomWalletButton />
           </div>
         </div>
       </nav>
@@ -63,10 +64,10 @@ export default function InvestorRoute() {
             </div>
 
             {/* Benefits Section */}
-            <div className='bg-muted/30 p-16 rounded-3xl space-y-12'>
+            {/* <div className='bg-muted/30 p-16 rounded-3xl space-y-12'>
               <div className='text-center space-y-4'>
                 <h2 className='text-4xl font-bold text-foreground'>
-                  Why Invest in Invoice Factoring?
+                  Why Invest in Invoicify?
                 </h2>
                 <p className='text-lg text-muted-foreground max-w-2xl mx-auto'>
                   Diversify your portfolio with real-world business financing
@@ -110,19 +111,28 @@ export default function InvestorRoute() {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* User Status */}
-            <div className='space-y-12'>
+            {/* <div className='space-y-12'>
               <WalletInfo />
-            </div>
+            </div> */}
             
+            {/* Price Feed Widget
+            <PythPriceWidget 
+              symbols={['PYUSD', 'ETH']} 
+              showRefresh={true}
+              className="max-w-2xl mx-auto"
+            /> */}
+
             {/* Main Workflow */}
             <div className='space-y-16'>
-              <DepositPYUSD />
-              <RiskPreferences />
-              <AutomaticMatching />
-              <CollectReturns />
+              {/* <DepositPYUSD /> */}
+              <QuickLiquidityDeposit />
+              <EstimatedReturns />
+              {/* <RiskPreferences />
+              <AutomaticMatching /> */}
+              {/* <CollectReturns /> */}
             </div>
           </div>
         ) : (
@@ -136,7 +146,7 @@ export default function InvestorRoute() {
               </p>
             </div>
             <div className='flex justify-center'>
-              <ConnectButton />
+              <CustomWalletButton />
             </div>
           </div>
         )}

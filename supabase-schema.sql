@@ -33,6 +33,11 @@ CREATE TABLE IF NOT EXISTS invoices (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Add ENS fields to invoices table (for existing installations)
+ALTER TABLE invoices 
+ADD COLUMN IF NOT EXISTS customer_address TEXT,
+ADD COLUMN IF NOT EXISTS customer_ens_name TEXT;
+
 -- Create invoice_factoring table
 CREATE TABLE IF NOT EXISTS invoice_factoring (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -57,6 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
 CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_created_at ON invoices(created_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_customer_ens_name ON invoices(customer_ens_name);
+CREATE INDEX IF NOT EXISTS idx_invoices_customer_address ON invoices(customer_address);
 CREATE INDEX IF NOT EXISTS idx_invoice_factoring_invoice_id ON invoice_factoring(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_factoring_user_id ON invoice_factoring(user_id);
 

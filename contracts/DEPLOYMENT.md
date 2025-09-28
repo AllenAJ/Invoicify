@@ -55,10 +55,19 @@ ETHERSCAN_API_KEY=your_etherscan_api_key_here
 
 ## Contract Address
 
-After deployment, you'll get a contract address like:
-`0x1234567890123456789012345678901234567890`
+**Latest Deployment (Correct PYUSD Address):**
+`0x49FA36529E6802579d78ad033C459b78b7e7c814`
 
-Update this in the frontend configuration.
+**Previous Deployment (Fixed 8 PYUSD Version):**
+`0xfC5e847E4995Df1dA5048d64984B1C56779BB492`
+
+**Previous Deployment (Liquidity Pool Version):**
+`0x4CA3602E11Ba801Ab602d6A8218472439b19E4c4`
+
+**Previous Deployment:**
+`0xF7c050ff27EE570C83F2574beEa73C4eBC12C9d9`
+
+Update this in the frontend configuration (`src/config/contract.ts`).
 
 ## Testing
 
